@@ -3,10 +3,10 @@
 import { useState, useEffect } from 'react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
 import { useStore } from '@/lib/store'
 import { ModelTestButton } from './ModelTestButton'
-import { Check, Loader2 } from 'lucide-react'
-import { Card } from '@/components/ui/card'
+import { Check, Loader2, Link2, Server } from 'lucide-react'
 
 export function OllamaConfig() {
   const { ollamaUrl, setOllamaUrl, ollamaModel, setOllamaModel } = useStore()
@@ -53,9 +53,13 @@ export function OllamaConfig() {
   }
 
   return (
-    <Card className="p-4 space-y-4">
-      <div className="space-y-2">
-        <label className="text-[13px] font-medium text-foreground">Ollama Server URL</label>
+    <div className="space-y-6">
+      {/* Server URL */}
+      <div className="p-4 rounded-lg border border-indigo-200/50 dark:border-indigo-900/30 bg-indigo-50/30 dark:bg-indigo-950/10">
+        <div className="flex items-center gap-2 mb-3">
+          <Link2 className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+          <label className="text-sm font-semibold text-foreground">Server URL</label>
+        </div>
         <div className="flex gap-2">
           <Input
             type="text"
@@ -65,17 +69,17 @@ export function OllamaConfig() {
               setSaved(false)
             }}
             placeholder="http://localhost:11434"
-            className="font-mono text-[12px] border-border/40 dark:border-border/20"
+            className="font-mono text-sm border-indigo-200 dark:border-indigo-900 focus:border-indigo-400 dark:focus:border-indigo-600"
           />
           <Button 
             onClick={handleSaveUrl}
             disabled={!urlValue || urlValue === ollamaUrl}
-            className="min-w-[75px]"
+            className="min-w-[90px]"
             size="sm"
           >
             {saved ? (
               <>
-                <Check className="w-3.5 h-3.5 mr-1" />
+                <Check className="w-4 h-4 mr-1.5" />
                 Saved
               </>
             ) : (
@@ -84,49 +88,61 @@ export function OllamaConfig() {
           </Button>
         </div>
         {saved && (
-          <p className="text-[11px] text-primary flex items-center gap-1">
-            <Check className="w-3 h-3" />
-            URL saved successfully
-          </p>
+          <div className="mt-2 flex items-center gap-1.5 text-xs text-indigo-600 dark:text-indigo-400 animate-fade-in">
+            <Check className="w-3.5 h-3.5" />
+            <span>URL saved successfully</span>
+          </div>
         )}
       </div>
 
-      <div className="space-y-2">
-        <label className="text-[13px] font-medium text-foreground">Ollama Model</label>
+      {/* Model Selection */}
+      <div className="space-y-3">
+        <div className="flex items-center gap-2">
+          <Server className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+          <label className="text-sm font-semibold text-foreground">Available Models</label>
+        </div>
         {loadingModels ? (
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <div className="flex items-center gap-2 p-4 text-sm text-muted-foreground bg-muted/30 rounded-lg">
             <Loader2 className="w-4 h-4 animate-spin" />
-            Fetching available models...
+            Fetching available models from Ollama...
           </div>
         ) : availableModels.length > 0 ? (
-          <div className="space-y-2">
-            <div className="grid grid-cols-2 gap-2 max-h-[200px] overflow-y-auto">
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-3 max-h-[240px] overflow-y-auto pr-2">
               {availableModels.map((model) => (
                 <Button
                   key={model}
                   onClick={() => setOllamaModel(model)}
                   variant={ollamaModel === model ? 'default' : 'outline'}
                   size="sm"
-                  className="justify-start text-[12px]"
+                  className="justify-between h-auto py-3 px-4 hover:scale-[1.02] transition-transform"
                 >
-                  {model}
-                  {ollamaModel === model && <Check className="w-3.5 h-3.5 ml-auto" />}
+                  <span className="font-mono text-sm">{model}</span>
+                  {ollamaModel === model && (
+                    <Badge variant="outline" className="ml-2 bg-green-500/10 text-green-600 dark:text-green-400 border-green-200 dark:border-green-900">
+                      <Check className="w-3 h-3" />
+                    </Badge>
+                  )}
                 </Button>
               ))}
             </div>
-            <ModelTestButton
-              provider="ollama"
-              modelId={ollamaModel}
-              ollamaUrl={ollamaUrl}
-              storeAsModelId={`ollama-${ollamaModel}`}
-            />
+            {ollamaModel && (
+              <div className="pt-2">
+                <ModelTestButton
+                  provider="ollama"
+                  modelId={ollamaModel}
+                  ollamaUrl={ollamaUrl}
+                  storeAsModelId={`ollama-${ollamaModel}`}
+                />
+              </div>
+            )}
           </div>
         ) : (
-          <div className="text-sm text-muted-foreground">
+          <div className="p-4 text-sm text-muted-foreground bg-muted/30 rounded-lg border border-dashed border-border">
             {ollamaUrl ? 'No models available. Make sure Ollama is running and models are installed.' : 'Enter Ollama URL to see available models'}
           </div>
         )}
       </div>
-    </Card>
+    </div>
   )
 }

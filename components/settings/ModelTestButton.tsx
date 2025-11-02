@@ -59,18 +59,24 @@ export function ModelTestButton({ provider, modelId, apiKey, ollamaUrl, compact 
 
   return (
     <div className="flex items-center gap-2">
-      {getStatusIcon(status)}
       <Button
         onClick={handleTest}
         disabled={isTesting}
         variant="outline"
         size="sm"
-        className="h-8"
+        className="h-9 font-medium hover:scale-[1.02] active:scale-[0.98] transition-transform"
       >
-        {isTesting ? 'Testing...' : 'Test'}
+        {isTesting ? (
+          <>
+            <Loader2 className="w-3.5 h-3.5 mr-2 animate-spin" />
+            Testing...
+          </>
+        ) : (
+          'Test Connection'
+        )}
       </Button>
-      {result && !isTesting && (
-        <span className="text-[11px] text-muted-foreground">
+      {result && !isTesting && status !== 'untested' && (
+        <span className={`text-xs font-medium animate-fade-in ${status === 'success' ? 'text-green-600 dark:text-green-400' : status === 'error' ? 'text-red-600 dark:text-red-400' : 'text-muted-foreground'}`}>
           {result.message}
         </span>
       )}
