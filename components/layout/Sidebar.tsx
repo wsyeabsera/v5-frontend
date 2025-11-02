@@ -1,6 +1,6 @@
 'use client'
 
-import { Home, MessageSquare, Settings, ChevronLeft, ChevronRight, List, Sparkles, Database, Cpu } from 'lucide-react'
+import { Home, MessageSquare, Settings, ChevronLeft, ChevronRight, List, Sparkles, Database, Cpu, Brain, GraduationCap } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useState } from 'react'
@@ -12,8 +12,10 @@ const navigation = [
   { name: 'Chat', href: '/chat', icon: MessageSquare },
   { name: 'Requests', href: '/requests', icon: List },
   { name: 'Complexity Detector', href: '/agents/complexity-detector', icon: Sparkles },
+  { name: 'Thought Agent', href: '/agents/thought-agent', icon: Brain },
   { name: 'Base Agent', href: '/agents/base-agent', icon: Cpu },
   { name: 'Complexity Examples', href: '/agents/complexity-examples', icon: Database },
+  { name: 'Thought Examples', href: '/agents/thought-examples', icon: GraduationCap },
   { name: 'Settings', href: '/settings', icon: Settings },
 ]
 

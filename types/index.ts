@@ -271,3 +271,81 @@ export interface BaseAgentOutput extends AgentOutput {
   parsed?: any; // Optional parsed structured data
 }
 
+/**
+ * Thought - Internal reasoning output from Thought Agent
+ * 
+ * This represents the AI's internal "thinking" before taking action.
+ * It's like a senior engineer's thought process written down.
+ */
+export interface Thought {
+  id: string; // Unique ID for this thought
+  timestamp: Date;
+  reasoning: string; // Natural language reasoning about the problem
+  approaches: string[]; // Multiple possible approaches to solve it
+  constraints: string[]; // Key constraints identified
+  assumptions: string[]; // Assumptions being made
+  uncertainties: string[]; // Areas of uncertainty
+  confidence: number; // 0-1 confidence in this reasoning
+}
+
+/**
+ * Thought Agent Result - Output with Request ID
+ */
+export interface ThoughtAgentOutput extends AgentOutput {
+  thoughts: Thought[]; // One or more thoughts (for multi-pass reasoning)
+  primaryApproach: string; // The main approach identified
+  keyInsights: string[]; // Key insights extracted
+  recommendedTools: string[]; // Tools that might be useful
+  complexityScore?: number; // From Complexity Detector
+  reasoningPass?: number; // Which pass this is (1, 2, or 3)
+  totalPasses?: number; // Total passes planned
+}
+
+/**
+ * Thought Example stored in Pinecone
+ * 
+ * Examples that teach the Thought Agent successful reasoning patterns
+ */
+export interface ThoughtExample {
+  id: string; // Pinecone vector ID
+  query: string; // Example user query
+  embedding: number[]; // Vector embedding (for similarity calculations)
+  reasoning: string; // Example reasoning about the problem
+  approaches: string[]; // Example approaches to solve it
+  constraints: string[]; // Example constraints identified
+  assumptions: string[]; // Example assumptions made
+  uncertainties: string[]; // Example uncertainties noted
+  recommendedTools: string[]; // Tools that worked well
+  successRating: number; // 0-1, how good this example is
+  tags: string[]; // Categories like ['data-query', 'facility-analysis', 'compliance']
+  createdAt: string; // ISO timestamp
+  updatedAt: string; // ISO timestamp
+  usageCount: number; // Track how often this example is matched
+}
+
+/**
+ * MCP Context - Information about available MCP resources
+ */
+export interface MCPContext {
+  tools: Array<{
+    name: string
+    description: string
+    inputSchema: any
+  }>
+  resources: Array<{
+    uri: string
+    name: string
+    description: string
+    mimeType: string
+  }>
+  prompts: Array<{
+    name: string
+    description: string
+    arguments: Array<{
+      name: string
+      description: string
+      required: boolean
+    }>
+  }>
+}
+

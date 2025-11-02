@@ -191,3 +191,26 @@ export async function deleteAllRequests(): Promise<{ success: boolean; count: nu
   return response.json()
 }
 
+/**
+ * Get requests with complexity-detector in their agent chain
+ * 
+ * Returns requests with a thoughtOutputExists boolean indicating
+ * whether thought output already exists for each request.
+ */
+export async function getRequestsWithComplexityDetector(): Promise<(RequestContext & { thoughtOutputExists: boolean })[]> {
+  const response = await fetch(`${API_BASE}/with-complexity-detector`)
+  
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}))
+    const errorMessage = errorData.error || `Failed to fetch requests: ${response.statusText}`
+    throw new Error(errorMessage)
+  }
+  
+  const data = await response.json()
+  // Convert date strings back to Date objects
+  return data.map((req: any) => ({
+    ...req,
+    createdAt: new Date(req.createdAt),
+  }))
+}
+

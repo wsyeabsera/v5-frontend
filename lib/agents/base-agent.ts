@@ -153,7 +153,13 @@ export abstract class BaseAgent {
       // Match "0:"text content" or "[index]:"text content""
       const match = line.match(/^\d+:"(.+)"$/)
       if (match) {
-        textParts.push(match[1])
+        // Unescape literal escape sequences (\n, \t, etc.)
+        const unescaped = match[1]
+          .replace(/\\n/g, '\n')
+          .replace(/\\t/g, '\t')
+          .replace(/\\r/g, '\r')
+          .replace(/\\\\/g, '\\')
+        textParts.push(unescaped)
       }
     }
 
@@ -190,10 +196,33 @@ export abstract class BaseAgent {
     const content = section ? this.extractSection(text, section) : text
     if (!content) return []
 
-    const items = content
-      .split(/\n/)
-      .map(line => line.replace(/^\d+\.\s*|^-\s*|^\*\s*/, '').trim())
-      .filter(Boolean)
+    // Match numbered lists (1. 2. 3.) or bullet points (- * •)
+    const numberedPattern = /(?:^|\n)(\d+\.\s+[^\n]+(?:\n(?!\d+\.\s+)[^\n]+)*)/g
+    const bulletPattern = /(?:^|\n)([-*•]\s+[^\n]+(?:\n(?![-*•]\s+)[^\n]+)*)/g
+    
+    let items: string[] = []
+    
+    // Try numbered list first
+    const numberedMatches = Array.from(content.matchAll(numberedPattern))
+    if (numberedMatches.length > 0) {
+      items = numberedMatches.map(m => 
+        m[1].replace(/^\d+\.\s*/, '').trim()
+      )
+    } else {
+      // Try bullet points
+      const bulletMatches = Array.from(content.matchAll(bulletPattern))
+      if (bulletMatches.length > 0) {
+        items = bulletMatches.map(m => 
+          m[1].replace(/^[-*•]\s*/, '').trim()
+        )
+      } else {
+        // Fallback to line-by-line
+        items = content
+          .split(/\n/)
+          .map(line => line.replace(/^\d+\.\s*|^-\s*|^\*\s*/, '').trim())
+          .filter(Boolean)
+      }
+    }
 
     return items
   }
