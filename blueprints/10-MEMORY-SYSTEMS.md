@@ -914,6 +914,201 @@ describe('ToolMemory', () => {
 - Tool Memory benefits from Reflection Agent (blueprint 09)
 - Goal Memory integrates with Planner Agent
 
+## 4. Task Tree Visualization
+
+**Purpose**: UI components to display task trees and progress to users.
+
+**Why It Matters**: Users need to see what the system is working on, especially for long-running tasks. Visualization makes the cognitive architecture transparent and builds trust.
+
+**Location**: `components/intelligent-chat/TaskTreeVisualization.tsx`
+
+### Implementation
+
+```typescript
+'use client'
+
+import { TaskTree, TaskNode } from '@/types'
+import { CheckCircle2, Circle, Loader2, XCircle, AlertCircle } from 'lucide-react'
+import { Card } from '@/components/ui/card'
+import { Progress } from '@/components/ui/progress'
+
+interface TaskTreeVisualizationProps {
+  taskTree: TaskTree
+  onNodeClick?: (node: TaskNode) => void
+}
+
+export function TaskTreeVisualization({ 
+  taskTree, 
+  onNodeClick 
+}: TaskTreeVisualizationProps) {
+  const progress = calculateProgress(taskTree)
+
+  return (
+    <Card className="p-4">
+      <div className="space-y-4">
+        {/* Header */}
+        <div>
+          <h3 className="text-lg font-semibold">{taskTree.goal}</h3>
+          <p className="text-sm text-muted-foreground">
+            {taskTree.userQuery}
+          </p>
+        </div>
+
+        {/* Progress Bar */}
+        <div className="space-y-2">
+          <div className="flex justify-between text-sm">
+            <span>Progress</span>
+            <span>{Math.round(progress * 100)}%</span>
+          </div>
+          <Progress value={progress * 100} />
+        </div>
+
+        {/* Task Tree */}
+        <div className="space-y-2">
+          {taskTree.subtasks.map((subtask) => (
+            <TaskNodeComponent
+              key={subtask.id}
+              node={subtask}
+              level={0}
+              onClick={onNodeClick}
+            />
+          ))}
+        </div>
+
+        {/* Status Summary */}
+        <div className="flex gap-4 text-sm text-muted-foreground">
+          <span>
+            {taskTree.subtasks.filter(s => s.status === 'completed').length} completed
+          </span>
+          <span>
+            {taskTree.subtasks.filter(s => s.status === 'in-progress').length} in progress
+          </span>
+          <span>
+            {taskTree.subtasks.filter(s => s.status === 'pending').length} pending
+          </span>
+          {taskTree.subtasks.some(s => s.status === 'failed') && (
+            <span className="text-destructive">
+              {taskTree.subtasks.filter(s => s.status === 'failed').length} failed
+            </span>
+          )}
+        </div>
+      </div>
+    </Card>
+  )
+}
+
+function TaskNodeComponent({
+  node,
+  level,
+  onClick,
+}: {
+  node: TaskNode
+  level: number
+  onClick?: (node: TaskNode) => void
+}) {
+  const icon = getStatusIcon(node.status)
+  const indent = level * 20
+
+  return (
+    <div
+      className={`flex items-start gap-2 p-2 rounded-lg hover:bg-muted/50 cursor-pointer transition-colors`}
+      style={{ paddingLeft: `${indent + 8}px` }}
+      onClick={() => onClick?.(node)}
+    >
+      <div className="mt-0.5">{icon}</div>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2">
+          <span className="font-medium text-sm">{node.title}</span>
+          {node.dependencies && node.dependencies.length > 0 && (
+            <span className="text-xs text-muted-foreground">
+              (depends on: {node.dependencies.join(', ')})
+            </span>
+          )}
+        </div>
+        <p className="text-xs text-muted-foreground mt-1">{node.description}</p>
+        
+        {node.status === 'in-progress' && node.startedAt && (
+          <div className="text-xs text-muted-foreground mt-1">
+            Started: {formatDuration(Date.now() - node.startedAt.getTime())} ago
+          </div>
+        )}
+        
+        {node.error && (
+          <div className="text-xs text-destructive mt-1">{node.error}</div>
+        )}
+
+        {/* Nested children */}
+        {node.children && node.children.length > 0 && (
+          <div className="mt-2 space-y-1">
+            {node.children.map((child) => (
+              <TaskNodeComponent
+                key={child.id}
+                node={child}
+                level={level + 1}
+                onClick={onClick}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function getStatusIcon(status: TaskNode['status']) {
+  switch (status) {
+    case 'completed':
+      return <CheckCircle2 className="w-4 h-4 text-green-500" />
+    case 'in-progress':
+      return <Loader2 className="w-4 h-4 text-blue-500 animate-spin" />
+    case 'failed':
+      return <XCircle className="w-4 h-4 text-red-500" />
+    case 'blocked':
+      return <AlertCircle className="w-4 h-4 text-yellow-500" />
+    default:
+      return <Circle className="w-4 h-4 text-muted-foreground" />
+  }
+}
+
+function calculateProgress(taskTree: TaskTree): number {
+  if (taskTree.subtasks.length === 0) return 0
+  
+  const completed = taskTree.subtasks.filter(s => s.status === 'completed').length
+  return completed / taskTree.subtasks.length
+}
+
+function formatDuration(ms: number): string {
+  if (ms < 1000) return `${ms}ms`
+  if (ms < 60000) return `${Math.floor(ms / 1000)}s`
+  if (ms < 3600000) return `${Math.floor(ms / 60000)}m`
+  return `${Math.floor(ms / 3600000)}h`
+}
+```
+
+### Usage Example
+
+```typescript
+// In IntelligentChatInterface
+const [activeTask, setActiveTask] = useState<TaskTree | null>(null)
+
+useEffect(() => {
+  // Get active task from goal memory
+  const task = goalMemory.getActiveTask()
+  setActiveTask(task)
+}, [])
+
+// Render
+{activeTask && (
+  <TaskTreeVisualization 
+    taskTree={activeTask}
+    onNodeClick={(node) => {
+      console.log('Clicked node:', node)
+      // Show details or expand
+    }}
+  />
+)}
+```
+
 ## Next Blueprint
 
 Read `11-ADAPTIVE-LEARNING-SYSTEMS.md` to implement Self-Tuning Prompts and Personality Memory.

@@ -14,6 +14,8 @@ This blueprint covers the foundational reasoning components that transform simpl
 ```
 User Query
     ↓
+Intent Understanding (classify intent)
+    ↓
 Complexity Detector → [Simple: 1 pass | Complex: 3 passes]
     ↓
 Thought Agent (reasoning pass 1)
@@ -25,6 +27,263 @@ Planner Agent (converts thoughts to plan)
 [If very complex → Thought Agent (pass 3) → Planner (optimization)]
     ↓
 Final Plan
+    ↓
+Executor (runs plan with MCP tools)
+```
+
+## Why These Layers Matter
+
+### Intent Understanding
+**Analogy**: Like a receptionist understanding what a visitor needs before directing them to the right department.
+
+Without intent understanding, the system might treat a simple question ("what time is it?") the same as a complex analysis request ("analyze all facilities"). Intent classification routes queries appropriately from the start.
+
+### Thought Agent
+**Analogy**: Like a senior engineer thinking through a problem before writing code - exploring approaches, considering constraints, identifying risks.
+
+The Thought Agent makes reasoning visible and structured. It's the "inner monologue" that ensures the system thinks before acting.
+
+### Planner Agent
+**Analogy**: Like a project manager breaking down a high-level goal into concrete tasks with dependencies and milestones.
+
+The Planner converts abstract reasoning into actionable steps, ensuring complex goals are achievable through structured execution.
+
+### Dynamic Reasoning Depth
+**Analogy**: Like a human adjusting thinking time - quick decision for "which coffee shop?" but deep analysis for "should I change careers?"
+
+The system adapts cognitive effort to task complexity, preventing overthinking simple queries and underthinking complex ones.
+
+### Executor
+**Analogy**: Like a skilled craftsman executing a blueprint - following the plan precisely while adapting to unexpected issues.
+
+The Executor bridges the gap between planning and action, handling tool orchestration, error recovery, and result validation.
+
+## 0. Intent Understanding
+
+**Purpose**: Parse and classify user queries before reasoning begins to route them appropriately.
+
+**Why It Matters**: Without intent classification, simple queries might get over-processed (wasting time/cost) while complex queries might be under-processed (poor results). Intent understanding optimizes the entire pipeline.
+
+**Location**: `lib/agents/intent-understanding.ts`
+
+### Interface
+
+```typescript
+export interface IntentClassification {
+  intent: IntentType;
+  confidence: number;
+  parameters: IntentParameters;
+  requiresReasoning: boolean; // Should this go through full reasoning?
+  suggestedComplexity: 'simple' | 'medium' | 'complex';
+}
+
+export type IntentType = 
+  | 'question'        // Asking for information
+  | 'command'         // Direct action request
+  | 'analysis'        // Deep analysis needed
+  | 'comparison'      // Comparing entities
+  | 'creation'        // Creating new resources
+  | 'modification'    // Updating existing resources
+  | 'deletion'        // Removing resources
+  | 'exploration'     // Exploring/browsing
+  | 'clarification'  // Asking for clarification
+  | 'help';           // Asking for help
+
+export interface IntentParameters {
+  entities?: string[];      // e.g., ['facility', 'shipment']
+  actions?: string[];       // e.g., ['list', 'analyze']
+  filters?: Record<string, any>;
+  timeFrame?: 'recent' | 'all' | 'historical';
+}
+```
+
+### Implementation
+
+```typescript
+import { BaseAgent } from './base-agent';
+
+export class IntentUnderstanding extends BaseAgent {
+  private readonly systemPrompt = `You are an Intent Understanding agent. Classify user queries to route them appropriately.
+
+Intent Types:
+- question: Asking for information (e.g., "What facilities exist?")
+- command: Direct action (e.g., "List all facilities")
+- analysis: Deep analysis needed (e.g., "Analyze facility performance")
+- comparison: Comparing entities (e.g., "Compare facility A vs B")
+- creation: Creating resources (e.g., "Create a new facility")
+- modification: Updating resources (e.g., "Update facility status")
+- deletion: Removing resources (e.g., "Delete facility X")
+- exploration: Browsing/exploring (e.g., "Show me facilities")
+- clarification: Asking for clarification
+- help: Asking for help
+
+Classify the user query.`;
+
+  async classifyIntent(
+    query: string,
+    context?: {
+      conversationHistory?: Array<{ role: string; content: string }>;
+    }
+  ): Promise<IntentClassification> {
+    // Quick heuristic check first
+    const heuristicIntent = this.heuristicClassification(query);
+    
+    // If confidence is high, use heuristic
+    if (heuristicIntent.confidence > 0.8) {
+      return heuristicIntent;
+    }
+
+    // Otherwise, use LLM for nuanced classification
+    const messages = [
+      { role: 'system' as const, content: this.systemPrompt },
+      {
+        role: 'user' as const,
+        content: `User Query: ${query}\n\nClassify this query. Provide:\nINTENT: [type]\nCONFIDENCE: [0.0-1.0]\nREQUIRES_REASONING: [yes/no]\nSUGGESTED_COMPLEXITY: [simple/medium/complex]\nPARAMETERS: [JSON with entities, actions, etc.]`,
+      },
+    ];
+
+    const response = await this.callLLM(messages, {
+      temperature: 0.3,
+      maxTokens: 500,
+    });
+
+    return this.parseIntentClassification(response, query);
+  }
+
+  private heuristicClassification(query: string): IntentClassification {
+    const queryLower = query.toLowerCase();
+    
+    // Question patterns
+    if (queryLower.match(/^(what|which|where|when|who|how|why)\s+/)) {
+      return {
+        intent: 'question',
+        confidence: 0.9,
+        parameters: {},
+        requiresReasoning: false,
+        suggestedComplexity: 'simple',
+      };
+    }
+
+    // Command patterns
+    if (queryLower.match(/^(list|show|get|fetch|display)\s+/)) {
+      return {
+        intent: 'command',
+        confidence: 0.85,
+        parameters: { actions: ['list'] },
+        requiresReasoning: false,
+        suggestedComplexity: 'simple',
+      };
+    }
+
+    // Analysis patterns
+    if (queryLower.match(/\b(analyze|analysis|evaluate|assess|examine|review)\b/)) {
+      return {
+        intent: 'analysis',
+        confidence: 0.9,
+        parameters: { actions: ['analyze'] },
+        requiresReasoning: true,
+        suggestedComplexity: 'complex',
+      };
+    }
+
+    // Comparison patterns
+    if (queryLower.match(/\b(compare|versus|vs|difference|similar)\b/)) {
+      return {
+        intent: 'comparison',
+        confidence: 0.85,
+        parameters: { actions: ['compare'] },
+        requiresReasoning: true,
+        suggestedComplexity: 'medium',
+      };
+    }
+
+    // Creation patterns
+    if (queryLower.match(/\b(create|add|new|insert)\b/)) {
+      return {
+        intent: 'creation',
+        confidence: 0.8,
+        parameters: { actions: ['create'] },
+        requiresReasoning: true,
+        suggestedComplexity: 'medium',
+      };
+    }
+
+    // Default to question
+    return {
+      intent: 'question',
+      confidence: 0.5,
+      parameters: {},
+      requiresReasoning: true,
+      suggestedComplexity: 'medium',
+    };
+  }
+
+  private parseIntentClassification(
+    response: string,
+    query: string
+  ): IntentClassification {
+    const intentMatch = response.match(/INTENT:\s*(\w+)/i);
+    const confidenceMatch = response.match(/CONFIDENCE:\s*([0-9.]+)/i);
+    const reasoningMatch = response.match(/REQUIRES_REASONING:\s*(yes|no)/i);
+    const complexityMatch = response.match(/SUGGESTED_COMPLEXITY:\s*(\w+)/i);
+    const paramsMatch = response.match(/PARAMETERS:\s*({[\s\S]*?})/i);
+
+    let intent: IntentType = 'question';
+    if (intentMatch) {
+      const intentStr = intentMatch[1].toLowerCase();
+      if (['question', 'command', 'analysis', 'comparison', 'creation', 
+           'modification', 'deletion', 'exploration', 'clarification', 'help']
+          .includes(intentStr)) {
+        intent = intentStr as IntentType;
+      }
+    }
+
+    const confidence = confidenceMatch 
+      ? Math.max(0, Math.min(1, parseFloat(confidenceMatch[1])))
+      : 0.7;
+
+    const requiresReasoning = reasoningMatch
+      ? reasoningMatch[1].toLowerCase() === 'yes'
+      : true;
+
+    const suggestedComplexity = complexityMatch
+      ? (complexityMatch[1].toLowerCase() as 'simple' | 'medium' | 'complex')
+      : 'medium';
+
+    let parameters: IntentParameters = {};
+    if (paramsMatch) {
+      try {
+        parameters = JSON.parse(paramsMatch[1]);
+      } catch {
+        // Fallback to basic extraction
+        parameters = this.extractBasicParameters(query);
+      }
+    } else {
+      parameters = this.extractBasicParameters(query);
+    }
+
+    return {
+      intent,
+      confidence,
+      parameters,
+      requiresReasoning,
+      suggestedComplexity,
+    };
+  }
+
+  private extractBasicParameters(query: string): IntentParameters {
+    const entities: string[] = [];
+    const entityKeywords = ['facility', 'shipment', 'contaminant', 'inspection', 'contract'];
+    
+    entityKeywords.forEach(keyword => {
+      if (query.toLowerCase().includes(keyword)) {
+        entities.push(keyword);
+      }
+    });
+
+    return { entities };
+  }
+}
 ```
 
 ## 1. Complexity Detector
@@ -859,6 +1118,331 @@ describe('ComplexityDetector', () => {
 - Base Agent must be created first
 - Types should be added before implementing agents
 - Reasoning Controller depends on all three agents
+
+## 5. Executor Agent
+
+**Purpose**: Execute plans by orchestrating MCP tool calls, handling errors, and validating results.
+
+**Why It Matters**: A plan is useless without execution. The Executor is the bridge between planning (abstract) and action (concrete). It handles the messy reality of tool failures, retries, and partial results that plans don't anticipate.
+
+**Analogy**: Like a construction foreman executing an architect's blueprint - following the plan but adapting when materials aren't available or unexpected issues arise.
+
+**Location**: `lib/agents/executor-agent.ts`
+
+### Interface
+
+```typescript
+export interface ExecutionResult {
+  stepId: string;
+  success: boolean;
+  result?: any;
+  error?: string;
+  duration: number;
+  retries: number;
+  timestamp: Date;
+}
+
+export interface PlanExecutionResult {
+  planId: string;
+  steps: ExecutionResult[];
+  overallSuccess: boolean;
+  partialResults: Record<string, any>;
+  errors: string[];
+  totalDuration: number;
+}
+```
+
+### Implementation
+
+```typescript
+import { BaseAgent } from './base-agent';
+import { Plan, PlanStep } from '@/types';
+import { mcpClient } from '@/lib/mcp-client';
+import { ToolMemory } from '@/lib/memory/tool-memory';
+import { ExecutionResult, PlanExecutionResult } from '@/types';
+
+export class ExecutorAgent {
+  constructor(
+    private toolMemory?: ToolMemory,
+    private maxRetries: number = 3,
+    private retryDelay: number = 1000
+  ) {}
+
+  /**
+   * Execute a complete plan
+   */
+  async executePlan(
+    plan: Plan,
+    context: {
+      availableTools?: string[];
+      onStepComplete?: (step: PlanStep, result: ExecutionResult) => void;
+      onStepError?: (step: PlanStep, error: Error) => void;
+    } = {}
+  ): Promise<PlanExecutionResult> {
+    const startTime = Date.now();
+    const executionResults: ExecutionResult[] = [];
+    const partialResults: Record<string, any> = {};
+    const errors: string[] = [];
+
+    // Execute steps in order, respecting dependencies
+    const executedSteps = new Set<string>();
+    const readySteps = this.getReadySteps(plan.steps, executedSteps);
+
+    while (readySteps.length > 0) {
+      for (const step of readySteps) {
+        try {
+          const result = await this.executeStep(step, plan, partialResults);
+          executionResults.push(result);
+          
+          if (result.success && result.result) {
+            partialResults[step.id] = result.result;
+          } else if (result.error) {
+            errors.push(`Step ${step.order}: ${result.error}`);
+          }
+
+          // Notify callback
+          context.onStepComplete?.(step, result);
+
+          executedSteps.add(step.id);
+        } catch (error: any) {
+          const errorResult: ExecutionResult = {
+            stepId: step.id,
+            success: false,
+            error: error.message,
+            duration: 0,
+            retries: this.maxRetries,
+            timestamp: new Date(),
+          };
+          executionResults.push(errorResult);
+          errors.push(`Step ${step.order}: ${error.message}`);
+          
+          context.onStepError?.(step, error);
+          
+          // Mark as executed to prevent infinite loops
+          executedSteps.add(step.id);
+        }
+      }
+
+      // Get next ready steps
+      const newReadySteps = this.getReadySteps(plan.steps, executedSteps);
+      if (newReadySteps.length === 0 && executedSteps.size < plan.steps.length) {
+        // Deadlock - some steps can't execute
+        const remainingSteps = plan.steps.filter(s => !executedSteps.has(s.id));
+        errors.push(`Execution deadlock: Steps ${remainingSteps.map(s => s.order).join(', ')} cannot execute`);
+        break;
+      }
+      readySteps.length = 0;
+      readySteps.push(...newReadySteps);
+    }
+
+    const totalDuration = Date.now() - startTime;
+    const overallSuccess = errors.length === 0 && executedSteps.size === plan.steps.length;
+
+    return {
+      planId: plan.id,
+      steps: executionResults,
+      overallSuccess,
+      partialResults,
+      errors,
+      totalDuration,
+    };
+  }
+
+  /**
+   * Execute a single plan step
+   */
+  private async executeStep(
+    step: PlanStep,
+    plan: Plan,
+    partialResults: Record<string, any>
+  ): Promise<ExecutionResult> {
+    const startTime = Date.now();
+    let lastError: Error | null = null;
+    let retries = 0;
+
+    // Get optimal parameters from tool memory if available
+    let parameters = step.parameters || {};
+    if (this.toolMemory && step.action) {
+      const optimalParams = await this.toolMemory.recallOptimal(step.action, {
+        queryLength: plan.goal.length,
+        queryComplexity: plan.estimatedComplexity,
+        taskType: this.inferTaskType(step),
+      });
+
+      if (optimalParams) {
+        // Merge with step parameters (step params take precedence)
+        parameters = { ...optimalParams, ...parameters };
+      }
+    }
+
+    // Substitute variables from previous step results
+    parameters = this.substituteVariables(parameters, partialResults);
+
+    while (retries <= this.maxRetries) {
+      try {
+        // Execute tool call
+        const result = await this.callTool(step.action, parameters);
+
+        const duration = Date.now() - startTime;
+
+        // Remember successful usage in tool memory
+        if (this.toolMemory && step.action) {
+          await this.toolMemory.rememberSuccess(
+            step.action,
+            parameters,
+            {
+              queryLength: plan.goal.length,
+              queryComplexity: plan.estimatedComplexity,
+              taskType: this.inferTaskType(step),
+            },
+            'success'
+          );
+        }
+
+        return {
+          stepId: step.id,
+          success: true,
+          result,
+          duration,
+          retries,
+          timestamp: new Date(),
+        };
+      } catch (error: any) {
+        lastError = error;
+        retries++;
+
+        if (retries <= this.maxRetries) {
+          // Exponential backoff
+          await new Promise(resolve => 
+            setTimeout(resolve, this.retryDelay * Math.pow(2, retries - 1))
+          );
+        } else {
+          // Remember failure in tool memory
+          if (this.toolMemory && step.action) {
+            await this.toolMemory.rememberSuccess(
+              step.action,
+              parameters,
+              {
+                queryLength: plan.goal.length,
+                queryComplexity: plan.estimatedComplexity,
+                taskType: this.inferTaskType(step),
+              },
+              'failure'
+            );
+          }
+        }
+      }
+    }
+
+    const duration = Date.now() - startTime;
+
+    return {
+      stepId: step.id,
+      success: false,
+      error: lastError?.message || 'Execution failed after retries',
+      duration,
+      retries: this.maxRetries,
+      timestamp: new Date(),
+    };
+  }
+
+  /**
+   * Call MCP tool
+   */
+  private async callTool(toolName: string, parameters: Record<string, any>): Promise<any> {
+    // Use existing MCP client
+    const result = await mcpClient.callTool(toolName, parameters);
+    return result.result || result;
+  }
+
+  /**
+   * Get steps ready to execute (all dependencies satisfied)
+   */
+  private getReadySteps(
+    steps: PlanStep[],
+    executedSteps: Set<string>
+  ): PlanStep[] {
+    return steps.filter(step => {
+      // Skip if already executed
+      if (executedSteps.has(step.id)) return false;
+
+      // Check if all dependencies are satisfied
+      if (!step.dependencies || step.dependencies.length === 0) {
+        return true; // No dependencies
+      }
+
+      return step.dependencies.every(depId => executedSteps.has(depId));
+    });
+  }
+
+  /**
+   * Substitute variables in parameters with values from previous results
+   */
+  private substituteVariables(
+    parameters: Record<string, any>,
+    partialResults: Record<string, any>
+  ): Record<string, any> {
+    const substituted: Record<string, any> = { ...parameters };
+
+    for (const [key, value] of Object.entries(substituted)) {
+      if (typeof value === 'string' && value.startsWith('$')) {
+        // Variable reference: $step-1.result.id
+        const match = value.match(/\$step-(\d+)\.(.+)/);
+        if (match) {
+          const stepId = `step-${match[1]}`;
+          const path = match[2];
+          
+          if (partialResults[stepId]) {
+            const result = partialResults[stepId];
+            // Simple path access (could be enhanced with lodash.get)
+            const pathParts = path.split('.');
+            let value = result;
+            for (const part of pathParts) {
+              value = value?.[part];
+            }
+            substituted[key] = value;
+          }
+        }
+      }
+    }
+
+    return substituted;
+  }
+
+  /**
+   * Infer task type from step description
+   */
+  private inferTaskType(step: PlanStep): 'query' | 'analysis' | 'creation' | 'modification' {
+    const desc = step.description.toLowerCase();
+    if (desc.includes('create') || desc.includes('add')) return 'creation';
+    if (desc.includes('update') || desc.includes('modify')) return 'modification';
+    if (desc.includes('analyze') || desc.includes('compare')) return 'analysis';
+    return 'query';
+  }
+}
+```
+
+### Integration Example
+
+```typescript
+// In orchestrator or API route
+const executor = new ExecutorAgent(toolMemory);
+
+const executionResult = await executor.executePlan(plan, {
+  onStepComplete: (step, result) => {
+    console.log(`Step ${step.order} completed:`, result.success);
+    // Update UI progress
+  },
+  onStepError: (step, error) => {
+    console.error(`Step ${step.order} failed:`, error);
+    // Notify user or trigger replanning
+  },
+});
+
+if (!executionResult.overallSuccess) {
+  // Trigger replanning or error handling
+}
+```
 
 ## Next Blueprint
 

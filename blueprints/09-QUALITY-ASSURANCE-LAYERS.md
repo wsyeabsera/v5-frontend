@@ -314,6 +314,10 @@ ${context.previousCritiques
 
 **Purpose**: Self-awareness - the system questions its own reasoning quality and detects when to think deeper.
 
+**Why It Matters**: This is the "senior engineer reviewing a junior's pull request" layer. The Meta-Agent provides **live self-assessment** - the system doesn't just reflect after the fact, it questions its reasoning **during** the thinking process. This prevents overconfidence and enables real-time self-correction.
+
+**Analogy**: Like a senior engineer reviewing a junior's pull request before merge - catching issues, asking "are you sure about this?", and triggering deeper thinking when needed.
+
 **Location**: `lib/agents/meta-agent.ts`
 
 ### Interface
@@ -359,6 +363,54 @@ Think like a meta-cognitive system - you're thinking about thinking.`;
 
   private readonly REPLAN_THRESHOLD = 0.6;
   private readonly DEEP_THINK_THRESHOLD = 0.7;
+
+  /**
+   * Live self-assessment during reasoning (not just post-analysis)
+   * 
+   * This is the key differentiator - the Meta-Agent checks reasoning quality
+   * WHILE the system is thinking, not just after it's done.
+   */
+  async liveSelfAssessment(
+    currentThought: { reasoning: string; confidence: number },
+    currentPlan: { goal: string; steps: number; confidence: number } | null
+  ): Promise<{
+    shouldContinue: boolean;
+    shouldDeepen: boolean;
+    confidenceAdjustment: number; // -1 to 1, how much to adjust confidence
+    feedback: string;
+  }> {
+    const messages = [
+      {
+        role: 'system' as const,
+        content: `You are a Meta-Agent doing LIVE self-assessment. You evaluate reasoning AS IT HAPPENS, not after.
+
+Current reasoning in progress:
+${currentThought.reasoning}
+
+Current confidence: ${currentThought.confidence.toFixed(2)}
+
+Question: Is this reasoning chain sound? Should we think deeper? Are we being too confident or not confident enough?
+
+Provide live feedback:
+
+SHOULD_CONTINUE: [yes/no] - Should reasoning continue or stop?
+SHOULD_DEEPEN: [yes/no] - Should we think deeper about this?
+CONFIDENCE_ADJUSTMENT: [-1.0 to 1.0] - How much to adjust confidence? Negative = less confident, positive = more confident
+FEEDBACK: [Your assessment]`,
+      },
+      {
+        role: 'user' as const,
+        content: 'Assess the current reasoning state.',
+      },
+    ];
+
+    const response = await this.callLLM(messages, {
+      temperature: 0.4,
+      maxTokens: 500,
+    });
+
+    return this.parseLiveAssessment(response);
+  }
 
   /**
    * Evaluate the quality of reasoning and decide if replanning is needed
@@ -483,6 +535,27 @@ FEEDBACK: [Your assessment and recommendations]`;
     const regex = new RegExp(`${label}:\\s*(yes|no|true|false)`, 'i');
     const match = text.match(regex);
     return match ? ['yes', 'true'].includes(match[1].toLowerCase()) : false;
+  }
+
+  private parseLiveAssessment(response: string): {
+    shouldContinue: boolean;
+    shouldDeepen: boolean;
+    confidenceAdjustment: number;
+    feedback: string;
+  } {
+    const continueMatch = response.match(/SHOULD_CONTINUE:\s*(yes|no)/i);
+    const deepenMatch = response.match(/SHOULD_DEEPEN:\s*(yes|no)/i);
+    const adjustmentMatch = response.match(/CONFIDENCE_ADJUSTMENT:\s*([-]?[0-9.]+)/i);
+    const feedbackMatch = response.match(/FEEDBACK:\s*([^\n]+(?:\n[^\n]+)*)/i);
+
+    return {
+      shouldContinue: continueMatch ? continueMatch[1].toLowerCase() === 'yes' : true,
+      shouldDeepen: deepenMatch ? deepenMatch[1].toLowerCase() === 'yes' : false,
+      confidenceAdjustment: adjustmentMatch
+        ? Math.max(-1, Math.min(1, parseFloat(adjustmentMatch[1])))
+        : 0,
+      feedback: feedbackMatch ? feedbackMatch[1].trim() : 'No specific feedback',
+    };
   }
 
   private extractNumber(text: string, label: string): number | null {
@@ -716,9 +789,61 @@ export class ConfidenceScorer {
 }
 ```
 
-## Integration with Reasoning Flow
+## Integration with Reasoning Flow - Live Self-Assessment
 
 **Location**: `lib/orchestrator/intelligence-orchestrator.ts` (partial)
+
+### Example: Live Self-Assessment in Reasoning Loop
+
+```typescript
+// In ReasoningController or IntelligenceOrchestrator
+async executeReasoningWithLiveAssessment(
+  userQuery: string,
+  metaAgent: MetaAgent,
+  context: any
+): Promise<ReasoningResult> {
+  const thoughts: Thought[] = [];
+  
+  for (let pass = 1; pass <= maxPasses; pass++) {
+    // Generate thought
+    const thought = await this.thoughtAgent.generateThoughtLoop(
+      userQuery,
+      thoughts[thoughts.length - 1] || null,
+      pass,
+      maxPasses
+    );
+
+    // LIVE SELF-ASSESSMENT - check reasoning quality while thinking
+    const liveAssessment = await metaAgent.liveSelfAssessment(
+      { reasoning: thought.reasoning, confidence: thought.confidence },
+      null // Plan not created yet
+    );
+
+    // Adjust confidence based on meta-agent feedback
+    thought.confidence = Math.max(0, Math.min(1, 
+      thought.confidence + liveAssessment.confidenceAdjustment * 0.2
+    ));
+
+    // If meta-agent says to think deeper, add another pass
+    if (liveAssessment.shouldDeepen && pass < maxPasses) {
+      console.log('[Meta-Agent] Requesting deeper thinking:', liveAssessment.feedback);
+      maxPasses = Math.min(3, maxPasses + 1);
+    }
+
+    // If meta-agent says to stop, abort reasoning
+    if (!liveAssessment.shouldContinue) {
+      console.log('[Meta-Agent] Reasoning quality too low, stopping:', liveAssessment.feedback);
+      break;
+    }
+
+    thoughts.push(thought);
+  }
+
+  // Continue with planning...
+}
+```
+
+## Integration with Reasoning Flow
 
 ```typescript
 import { ReasoningController } from './reasoning-controller';
@@ -878,6 +1003,290 @@ describe('CriticAgent', () => {
 - Requires Thought Agent and Planner Agent from blueprint 08
 - Confidence Scorer aggregates data from all previous agents
 - Orchestrator coordinates all quality assurance layers
+
+## 4. Reflection Agent
+
+**Purpose**: Post-execution learning and improvement - analyzing what worked and what didn't.
+
+**Why It Matters**: Reflection is where the system learns from experience. Unlike Critic (which evaluates before execution) or Meta-Agent (which questions during reasoning), Reflection analyzes **after** execution to improve future performance. It's the "what did I learn?" moment.
+
+**Analogy**: Like a project retrospective - after a sprint, the team reflects: "What went well? What didn't? How can we do better next time?"
+
+**Key Difference from Other Agents**:
+- **Critic**: Pre-execution evaluation (before action)
+- **Meta-Agent**: Live self-assessment (during reasoning)
+- **Reflection**: Post-execution learning (after action)
+
+**Location**: `lib/agents/reflection-agent.ts`
+
+### Interface
+
+```typescript
+export interface Reflection {
+  id: string;
+  planId: string;
+  executionResult: ExecutionResult;
+  insights: ReflectionInsight[];
+  lessonsLearned: string[];
+  improvements: SuggestedImprovement[];
+  confidence: number;
+  timestamp: Date;
+}
+
+export interface ReflectionInsight {
+  category: 'success' | 'failure' | 'efficiency' | 'approach';
+  description: string;
+  evidence: string[];
+  impact: 'low' | 'medium' | 'high';
+}
+
+export interface SuggestedImprovement {
+  area: 'planning' | 'execution' | 'tool-usage' | 'reasoning';
+  suggestion: string;
+  priority: 'low' | 'medium' | 'high';
+  expectedImpact: string;
+}
+```
+
+### Implementation
+
+```typescript
+import { BaseAgent } from './base-agent';
+import { Plan, PlanStep } from '@/types';
+import { ExecutionResult, PlanExecutionResult } from '@/types';
+import { Reflection, ReflectionInsight, SuggestedImprovement } from '@/types';
+import { ToolMemory } from '@/lib/memory/tool-memory';
+
+export class ReflectionAgent extends BaseAgent {
+  constructor(
+    apiKey: string,
+    modelId: string,
+    private toolMemory?: ToolMemory
+  ) {
+    super(apiKey, modelId);
+  }
+
+  private readonly systemPrompt = `You are a Reflection Agent - you analyze execution results to extract lessons learned.
+
+After a plan is executed, your job is to:
+1. Analyze what worked and what didn't
+2. Identify patterns and insights
+3. Suggest improvements for future executions
+4. Extract lessons that can improve tool usage, planning, and reasoning
+
+Think like a project manager doing a retrospective - be honest, constructive, and actionable.`;
+
+  /**
+   * Reflect on execution results and generate insights
+   */
+  async reflect(
+    plan: Plan,
+    executionResult: PlanExecutionResult,
+    context: {
+      originalQuery?: string;
+      reasoningSteps?: any[];
+      critique?: any;
+    } = {}
+  ): Promise<Reflection> {
+    const messages = [
+      {
+        role: 'system' as const,
+        content: this.systemPrompt,
+      },
+      {
+        role: 'user' as const,
+        content: this.buildReflectionPrompt(plan, executionResult, context),
+      },
+    ];
+
+    const response = await this.callLLM(messages, {
+      temperature: 0.5,
+      maxTokens: 2000,
+    });
+
+    const reflection = this.parseReflection(response, plan.id, executionResult);
+
+    // Update tool memory with insights
+    await this.updateToolMemory(reflection, executionResult);
+
+    return reflection;
+  }
+
+  private buildReflectionPrompt(
+    plan: Plan,
+    executionResult: PlanExecutionResult,
+    context: any
+  ): string {
+    return `Plan Executed:
+GOAL: ${plan.goal}
+
+STEPS:
+${plan.steps.map(s => `${s.order}. ${s.description} (${s.action})`).join('\n')}
+
+Execution Results:
+- Overall Success: ${executionResult.overallSuccess ? 'Yes' : 'No'}
+- Duration: ${executionResult.totalDuration}ms
+- Steps Completed: ${executionResult.steps.filter(s => s.success).length}/${executionResult.steps.length}
+- Errors: ${executionResult.errors.length > 0 ? executionResult.errors.join(', ') : 'None'}
+
+Step-by-Step Results:
+${executionResult.steps.map(s => `
+Step ${s.stepId}:
+  Success: ${s.success}
+  Duration: ${s.duration}ms
+  Retries: ${s.retries}
+  ${s.error ? `Error: ${s.error}` : `Result: ${JSON.stringify(s.result).substring(0, 200)}...`}
+`).join('\n')}
+
+${context.originalQuery ? `Original Query: ${context.originalQuery}\n` : ''}
+
+Reflect on this execution. Provide:
+
+INSIGHTS:
+1. [CATEGORY: success/failure/efficiency/approach]
+   Description: [What happened]
+   Evidence: [Supporting evidence]
+   Impact: [low/medium/high]
+
+2. [Next insight...]
+
+LESSONS_LEARNED:
+- [Lesson 1 - what can we learn from this?]
+- [Lesson 2 - what patterns do we see?]
+
+IMPROVEMENTS:
+1. [AREA: planning/execution/tool-usage/reasoning]
+   Suggestion: [What should we do differently next time?]
+   Priority: [low/medium/high]
+   Expected Impact: [What will this improve?]
+
+2. [Next improvement...]
+
+CONFIDENCE: [0.0-1.0] - How confident are you in these insights?`;
+  }
+
+  private parseReflection(
+    response: string,
+    planId: string,
+    executionResult: PlanExecutionResult
+  ): Reflection {
+    const insights = this.parseInsights(response);
+    const lessonsLearned = this.extractList(response, 'LESSONS_LEARNED');
+    const improvements = this.parseImprovements(response);
+    const confidence = this.extractScore(response, 'CONFIDENCE');
+
+    return {
+      id: `reflection-${Date.now()}`,
+      planId,
+      executionResult,
+      insights,
+      lessonsLearned,
+      improvements,
+      confidence,
+      timestamp: new Date(),
+    };
+  }
+
+  private parseInsights(response: string): ReflectionInsight[] {
+    const insightsSection = this.extractSection(response, 'INSIGHTS');
+    if (!insightsSection) return [];
+
+    const insightRegex = /(\d+)\.\s*\[CATEGORY:\s*(\w+)\]\s*Description:\s*([^\n]+)\s*Evidence:\s*([^\n]+)\s*Impact:\s*(\w+)/gi;
+    const matches = Array.from(insightsSection.matchAll(insightRegex));
+
+    return matches.map(match => ({
+      category: (match[2].toLowerCase() || 'success') as ReflectionInsight['category'],
+      description: match[3]?.trim() || '',
+      evidence: match[4]?.split(',').map(e => e.trim()),
+      impact: (match[5].toLowerCase() || 'medium') as ReflectionInsight['impact'],
+    }));
+  }
+
+  private parseImprovements(response: string): SuggestedImprovement[] {
+    const improvementsSection = this.extractSection(response, 'IMPROVEMENTS');
+    if (!improvementsSection) return [];
+
+    const improvementRegex = /(\d+)\.\s*\[AREA:\s*(\w+)\]\s*Suggestion:\s*([^\n]+)\s*Priority:\s*(\w+)\s*Expected Impact:\s*([^\n]+)/gi;
+    const matches = Array.from(improvementsSection.matchAll(improvementRegex));
+
+    return matches.map(match => ({
+      area: (match[2].toLowerCase() || 'planning') as SuggestedImprovement['area'],
+      suggestion: match[3]?.trim() || '',
+      priority: (match[4].toLowerCase() || 'medium') as SuggestedImprovement['priority'],
+      expectedImpact: match[5]?.trim() || '',
+    }));
+  }
+
+  /**
+   * Update tool memory based on reflection insights
+   */
+  private async updateToolMemory(
+    reflection: Reflection,
+    executionResult: PlanExecutionResult
+  ): Promise<void> {
+    if (!this.toolMemory) return;
+
+    // Extract tool usage insights
+    for (const stepResult of executionResult.steps) {
+      const step = reflection.executionResult.steps.find(s => s.stepId === stepResult.stepId);
+      if (!step) continue;
+
+      // Find corresponding plan step to get tool name
+      // This would require passing the plan steps to reflection
+      // For now, we'll use a simplified approach
+
+      const toolInsights = reflection.insights.filter(i => 
+        i.description.toLowerCase().includes('tool') || 
+        i.category === 'efficiency'
+      );
+
+      if (toolInsights.length > 0 && stepResult.success) {
+        // Remember successful tool usage patterns
+        // This is a simplified example - full implementation would track actual tool names
+      }
+    }
+  }
+
+  private extractScore(text: string, label: string): number {
+    const regex = new RegExp(`${label}:\\s*([0-9.]+)`, 'i');
+    const match = text.match(regex);
+    return match ? Math.max(0, Math.min(1, parseFloat(match[1]))) : 0.7;
+  }
+
+  private extractList(text: string, section: string): string[] {
+    const sectionText = this.extractSection(response, section);
+    if (!sectionText) return [];
+
+    return sectionText
+      .split(/\n/)
+      .map(line => line.replace(/^[-*]\s*/, '').trim())
+      .filter(Boolean);
+  }
+
+  private extractSection(text: string, section: string): string | null {
+    const regex = new RegExp(`${section}:\\s*([\\s\\S]*?)(?:\\n\\n[A-Z_]+:|$)`, 'i');
+    const match = text.match(regex);
+    return match ? match[1].trim() : null;
+  }
+}
+```
+
+### Integration Example
+
+```typescript
+// After execution
+const reflection = await reflectionAgent.reflect(plan, executionResult, {
+  originalQuery: userQuery,
+  reasoningSteps: reasoningResult.thoughts,
+  critique: critiqueResult,
+});
+
+// Use insights to improve future planning
+if (reflection.improvements.length > 0) {
+  console.log('Reflection insights:', reflection.lessonsLearned);
+  // Store improvements for future use
+}
+```
 
 ## Next Blueprint
 

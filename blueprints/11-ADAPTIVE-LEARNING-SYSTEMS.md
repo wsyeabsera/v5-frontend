@@ -226,24 +226,217 @@ EXPECTED_IMPROVEMENT: [0.0-1.0 estimate]`,
   }
 
   /**
-   * Apply a tuned prompt to an agent
+   * Apply a tuned prompt to an agent with version control
    */
   async applyTunedPrompt(
     agentName: string,
-    tuningResult: PromptTuningResult
-  ): Promise<void> {
-    // In real implementation, update the agent's system prompt
-    // This would require agent refactoring to support dynamic prompts
+    tuningResult: PromptTuningResult,
+    options: {
+      strategy?: 'immediate' | 'a_b_test' | 'gradual_rollout';
+      testPercentage?: number; // For A/B testing
+    } = {}
+  ): Promise<string> {
+    const strategy = options.strategy || 'immediate';
+    const newVersion = `v${Date.now()}`;
     
-    // For now, store the updated prompt
-    const storageKey = `prompt-${agentName}-v${Date.now()}`;
+    // Store prompt version with metadata
+    const promptVersion = {
+      version: newVersion,
+      agentName,
+      prompt: tuningResult.updatedPrompt,
+      originalPrompt: tuningResult.originalPrompt,
+      changes: tuningResult.changes,
+      rationale: tuningResult.rationale,
+      expectedImprovement: tuningResult.expectedImprovement,
+      createdAt: new Date().toISOString(),
+      appliedStrategy: strategy,
+    };
+
+    const storageKey = `prompt-${agentName}-${newVersion}`;
     if (this.storageBackend === 'localStorage') {
-      localStorage.setItem(storageKey, JSON.stringify(tuningResult));
+      localStorage.setItem(storageKey, JSON.stringify(promptVersion));
+      
+      // Track active versions
+      const activeVersions = this.getActiveVersions(agentName);
+      activeVersions.push({
+        version: newVersion,
+        strategy,
+        appliedAt: new Date(),
+        testPercentage: options.testPercentage || 100,
+      });
+      localStorage.setItem(`prompt-versions-${agentName}`, JSON.stringify(activeVersions));
+    }
+
+    // Apply based on strategy
+    if (strategy === 'immediate') {
+      // Apply immediately to all instances
+      await this.updateAgentPrompt(agentName, tuningResult.updatedPrompt);
+    } else if (strategy === 'a_b_test') {
+      // A/B testing: apply to percentage of requests
+      const testPercentage = options.testPercentage || 50;
+      await this.setABTestConfig(agentName, {
+        versionA: this.getCurrentPromptVersion(agentName),
+        versionB: newVersion,
+        splitPercentage: testPercentage,
+      });
+    } else if (strategy === 'gradual_rollout') {
+      // Gradual rollout: start small, increase over time
+      await this.startGradualRollout(agentName, newVersion);
     }
 
     // Reset performance tracking for new prompt version
-    const newVersion = `v${Date.now()}`;
-    // Update version tracking
+    const newPerformance: PromptPerformance = {
+      agentName,
+      promptVersion: newVersion,
+      successCount: 0,
+      failureCount: 0,
+      averageConfidence: 0,
+      failurePatterns: [],
+      lastUpdated: new Date(),
+    };
+    this.performanceHistory.set(`${agentName}-${newVersion}`, newPerformance);
+    await this.savePerformanceHistory();
+
+    return newVersion;
+  }
+
+  /**
+   * A/B test prompt versions
+   */
+  private async setABTestConfig(
+    agentName: string,
+    config: {
+      versionA: string;
+      versionB: string;
+      splitPercentage: number; // % of requests using versionB
+    }
+  ): Promise<void> {
+    const abTestKey = `ab-test-${agentName}`;
+    if (this.storageBackend === 'localStorage') {
+      localStorage.setItem(abTestKey, JSON.stringify(config));
+    }
+  }
+
+  /**
+   * Get prompt version to use (with A/B testing logic)
+   */
+  async getPromptVersionToUse(agentName: string): Promise<string> {
+    // Check for A/B test
+    const abTestKey = `ab-test-${agentName}`;
+    if (this.storageBackend === 'localStorage') {
+      const abTestStr = localStorage.getItem(abTestKey);
+      if (abTestStr) {
+        const abTest = JSON.parse(abTestStr);
+        const random = Math.random() * 100;
+        if (random < abTest.splitPercentage) {
+          return abTest.versionB;
+        }
+        return abTest.versionA;
+      }
+    }
+
+    // Default: use most recent version
+    return this.getCurrentPromptVersion(agentName);
+  }
+
+  /**
+   * Compare prompt versions and choose winner
+   */
+  async comparePromptVersions(
+    agentName: string,
+    versionA: string,
+    versionB: string
+  ): Promise<{
+    winner: 'A' | 'B' | 'tie';
+    metrics: {
+      versionA: { successRate: number; avgConfidence: number; totalAttempts: number };
+      versionB: { successRate: number; avgConfidence: number; totalAttempts: number };
+    };
+  }> {
+    const perfA = this.performanceHistory.get(`${agentName}-${versionA}`);
+    const perfB = this.performanceHistory.get(`${agentName}-${versionB}`);
+
+    if (!perfA || !perfB) {
+      return { winner: 'tie', metrics: {} as any };
+    }
+
+    const totalA = perfA.successCount + perfA.failureCount;
+    const totalB = perfB.successCount + perfB.failureCount;
+
+    if (totalA === 0 || totalB === 0) {
+      return { winner: 'tie', metrics: {} as any };
+    }
+
+    const successRateA = perfA.successCount / totalA;
+    const successRateB = perfB.successCount / totalB;
+
+    const metrics = {
+      versionA: {
+        successRate: successRateA,
+        avgConfidence: perfA.averageConfidence,
+        totalAttempts: totalA,
+      },
+      versionB: {
+        successRate: successRateB,
+        avgConfidence: perfB.averageConfidence,
+        totalAttempts: totalB,
+      },
+    };
+
+    // Determine winner (need minimum sample size)
+    const minSampleSize = 10;
+    if (totalA < minSampleSize || totalB < minSampleSize) {
+      return { winner: 'tie', metrics };
+    }
+
+    // Compare success rate and confidence
+    const scoreA = successRateA * 0.6 + perfA.averageConfidence * 0.4;
+    const scoreB = successRateB * 0.6 + perfB.averageConfidence * 0.4;
+
+    return {
+      winner: scoreB > scoreA ? 'B' : scoreA > scoreB ? 'A' : 'tie',
+      metrics,
+    };
+  }
+
+  private async updateAgentPrompt(agentName: string, prompt: string): Promise<void> {
+    // This would require refactoring agents to support dynamic prompts
+    // For now, store in a registry that agents can read from
+    const promptRegistryKey = `agent-prompt-${agentName}`;
+    if (this.storageBackend === 'localStorage') {
+      localStorage.setItem(promptRegistryKey, prompt);
+    }
+  }
+
+  private async startGradualRollout(agentName: string, newVersion: string): Promise<void> {
+    // Start with 10% rollout
+    await this.setABTestConfig(agentName, {
+      versionA: this.getCurrentPromptVersion(agentName),
+      versionB: newVersion,
+      splitPercentage: 10,
+    });
+
+    // Schedule gradual increases (would need a scheduler in production)
+    // Day 1: 10%, Day 2: 25%, Day 3: 50%, Day 4: 100%
+  }
+
+  private getActiveVersions(agentName: string): Array<{
+    version: string;
+    strategy: string;
+    appliedAt: Date;
+    testPercentage: number;
+  }> {
+    const versionsKey = `prompt-versions-${agentName}`;
+    if (this.storageBackend === 'localStorage') {
+      const versionsStr = localStorage.getItem(versionsKey);
+      if (versionsStr) {
+        return JSON.parse(versionsStr).map((v: any) => ({
+          ...v,
+          appliedAt: new Date(v.appliedAt),
+        }));
+      }
+    }
+    return [];
   }
 
   private shouldTunePrompt(performance: PromptPerformance): boolean {
