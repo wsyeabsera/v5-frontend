@@ -21,6 +21,7 @@ import {
 } from '@/components/ui/alert-dialog'
 import { useStore } from '@/lib/store'
 import { useModels } from '@/lib/queries'
+import { getProviderForModel } from '@/lib/ai-config'
 import { Check, Loader2, AlertCircle, Trash2, XCircle } from 'lucide-react'
 
 interface AgentConfigCardProps {
@@ -34,7 +35,7 @@ interface AgentConfigCardProps {
 export function AgentConfigCard({ config, onSave, onDelete, isSaving, isDeleting }: AgentConfigCardProps) {
   const [localConfig, setLocalConfig] = useState<AgentConfig>(config)
   const [hasChanges, setHasChanges] = useState(false)
-  const { modelTestResults } = useStore()
+  const { modelTestResults, apiKeys } = useStore()
   const { data: modelsData } = useModels()
 
   const models = modelsData?.models || []
@@ -50,7 +51,16 @@ export function AgentConfigCard({ config, onSave, onDelete, isSaving, isDeleting
     : false
 
   const handleModelChange = (modelId: string) => {
-    setLocalConfig({ ...localConfig, modelId })
+    // Auto-populate API key from store when model changes
+    const provider = getProviderForModel(modelId)
+    const apiKey = apiKeys[provider]
+    
+    setLocalConfig({ ...localConfig, modelId, apiKey })
+    setHasChanges(true)
+  }
+
+  const handleApiKeyChange = (apiKey: string) => {
+    setLocalConfig({ ...localConfig, apiKey })
     setHasChanges(true)
   }
 
@@ -173,6 +183,31 @@ export function AgentConfigCard({ config, onSave, onDelete, isSaving, isDeleting
           </p>
         )}
       </div>
+
+      {/* API Key */}
+      {localConfig.modelId && (
+        <div className="space-y-3 pt-4 border-t border-border/40">
+          <div className="flex items-center justify-between">
+            <label className="text-sm font-medium">API Key</label>
+            {localConfig.apiKey && (
+              <Badge variant="outline" className="bg-green-500/10 text-green-600 dark:text-green-400 border-green-200 dark:border-green-900">
+                <Check className="w-3 h-3 mr-1" />
+                Set
+              </Badge>
+            )}
+          </div>
+          <Input
+            type="password"
+            value={localConfig.apiKey || ''}
+            onChange={(e) => handleApiKeyChange(e.target.value)}
+            placeholder="API key will be auto-filled from your saved keys..."
+            className="h-10 font-mono text-sm"
+          />
+          <p className="text-xs text-muted-foreground">
+            API key for this model's provider. Auto-filled from your saved keys when you select a model.
+          </p>
+        </div>
+      )}
 
       {/* Parameters */}
       <div className="space-y-6 pt-4 border-t border-border/40">

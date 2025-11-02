@@ -255,10 +255,19 @@ export interface AgentConfig {
   name: string; // Display name
   description: string; // What this agent does
   modelId: string; // Selected model from settings (e.g., 'claude-sonnet')
+  apiKey?: string; // API key for the model provider (stored in MongoDB)
   parameters: AgentParameters; // Model parameters
   enabled: boolean; // Whether agent is active
   strategyConfig?: StrategyConfig; // Optional: Strategy configuration for detection methods
   createdAt?: string; // ISO timestamp
   updatedAt?: string; // ISO timestamp
+}
+
+/**
+ * Base Agent Output - Generic output for utility agents
+ */
+export interface BaseAgentOutput extends AgentOutput {
+  content: string; // Raw LLM response
+  parsed?: any; // Optional parsed structured data
 }
 

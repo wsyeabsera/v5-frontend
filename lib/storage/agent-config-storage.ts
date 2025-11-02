@@ -27,6 +27,18 @@ const DEFAULT_AGENT_CONFIGS: AgentConfig[] = [
     },
     enabled: true,
   },
+  {
+    agentId: 'base-agent',
+    name: 'Base Agent',
+    description: 'Shared utilities for LLM calls and response parsing',
+    modelId: '', // Empty until user configures
+    parameters: {
+      temperature: 0.7,
+      maxTokens: 1500,
+      topP: 0.9,
+    },
+    enabled: true,
+  },
 ]
 
 /**
@@ -152,11 +164,16 @@ export class AgentConfigStorage {
       const now = new Date().toISOString()
       
       // Upsert by agentId
+      // Exclude _id, createdAt, updatedAt from the update
+      // - _id: MongoDB doesn't allow updating _id
+      // - createdAt, updatedAt: Timestamps should only be set by the database
+      const { _id, createdAt, updatedAt, ...configToSave } = config
+      
       await collection.updateOne(
         { agentId: config.agentId },
         { 
           $set: {
-            ...config,
+            ...configToSave,
             updatedAt: now,
           },
           $setOnInsert: {
@@ -168,8 +185,13 @@ export class AgentConfigStorage {
 
       console.log(`[AgentConfig] Saved config for ${config.agentId}`)
       return true
-    } catch (error) {
+    } catch (error: any) {
       console.error(`[AgentConfig] Failed to save config for ${config.agentId}:`, error)
+      console.error('[AgentConfig] Error details:', {
+        message: error?.message,
+        name: error?.name,
+        stack: error?.stack?.split('\n').slice(0, 3)
+      })
       return false
     }
   }

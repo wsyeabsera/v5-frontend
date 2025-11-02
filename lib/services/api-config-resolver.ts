@@ -34,7 +34,7 @@ export interface ApiConfig {
  */
 export async function resolveApiConfig(
   agentConfig: AgentConfig | null,
-  headers: Headers
+  headers?: Headers
 ): Promise<ApiConfig | null> {
   if (!agentConfig || !agentConfig.enabled || !agentConfig.modelId) {
     logger.debug('No agent config, disabled agent, or missing modelId')
@@ -48,7 +48,8 @@ export async function resolveApiConfig(
   const actualModelName = modelConfig?.model || agentConfig.modelId
 
   // Resolve API key/URL based on provider
-  const apiKey = resolveProviderKey(provider, headers)
+  // Priority: agentConfig.apiKey -> env vars -> headers
+  const apiKey = resolveProviderKey(provider, agentConfig.apiKey, headers || new Headers())
   
   if (!apiKey) {
     logger.warn(`Agent config '${agentConfig.agentId}' found but no API key/URL available for provider '${provider}'`, {
@@ -82,17 +83,31 @@ export async function resolveApiConfig(
  * Resolve API key or URL for a specific provider
  * 
  * Priority:
- * 1. Environment variables
- * 2. Request headers (x-api-key)
- * 3. Default values (for Ollama only)
+ * 1. Agent config API key (from MongoDB)
+ * 2. Environment variables
+ * 3. Request headers (x-api-key)
+ * 4. Default values (for Ollama only)
  * 
  * @param provider - AI provider
+ * @param configApiKey - Optional API key from agent config
  * @param headers - Request headers
  * @returns API key/URL or null if not available
  */
-export function resolveProviderKey(provider: Provider, headers: Headers): string | null {
+export function resolveProviderKey(
+  provider: Provider,
+  configApiKey: string | undefined,
+  headers: Headers
+): string | null {
   let apiKey: string | null = null
   let keySource = 'none'
+
+  // Priority 1: Use API key from agent config if available
+  if (configApiKey) {
+    apiKey = configApiKey
+    keySource = 'config'
+    logger.debug(`Using API key from agent config for '${provider}'`)
+    return apiKey
+  }
 
   if (provider === 'ollama') {
     // Ollama uses URL, not API key
@@ -117,7 +132,9 @@ export function resolveProviderKey(provider: Provider, headers: Headers): string
     
     // Check environment variables based on provider
     if (provider === 'groq') {
-      apiKey = process.env.GROQ_API_KEY || process.env.NEXT_PUBLIC_GROQ_API_KEY || null
+      // Also check ANTHROPIC_API_KEY as some users might store Groq keys there
+      apiKey = process.env.GROQ_API_KEY || process.env.NEXT_PUBLIC_GROQ_API_KEY || 
+               process.env.ANTHROPIC_API_KEY || process.env.NEXT_PUBLIC_ANTHROPIC_API_KEY || null
     } else if (provider === 'anthropic') {
       apiKey = process.env.ANTHROPIC_API_KEY || process.env.NEXT_PUBLIC_ANTHROPIC_API_KEY || null
     } else if (provider === 'openai') {

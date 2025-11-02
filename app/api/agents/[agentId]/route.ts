@@ -61,7 +61,9 @@ export async function PUT(
       )
     }
 
-    return NextResponse.json({ config }, { status: 200 })
+    // Return the updated config (fetches from DB to ensure we have all fields)
+    const updatedConfig = await storage.getAgentConfig(agentId)
+    return NextResponse.json({ config: updatedConfig }, { status: 200 })
   } catch (error: any) {
     console.error('[Agents API] PUT error:', error)
     return NextResponse.json(
