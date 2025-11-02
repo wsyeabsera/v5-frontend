@@ -324,6 +324,66 @@ export interface ThoughtExample {
 }
 
 /**
+ * Plan Step - Individual step in an action plan
+ */
+export interface PlanStep {
+  id: string; // Unique step ID
+  order: number; // Execution order (1, 2, 3, ...)
+  description: string; // What this step does
+  action: string; // Tool name or action type
+  parameters?: Record<string, any>; // Parameters for the action
+  expectedOutcome: string; // What should happen
+  dependencies?: string[]; // IDs of steps that must complete first
+  status: 'pending' | 'in-progress' | 'completed' | 'failed';
+}
+
+/**
+ * Plan - Complete action plan with steps
+ */
+export interface Plan {
+  id: string;
+  goal: string; // Overall goal statement
+  steps: PlanStep[];
+  estimatedComplexity: number; // 0-1
+  confidence: number; // 0-1
+  dependencies: string[]; // Overall plan dependencies
+  createdAt: Date;
+}
+
+/**
+ * Planner Agent Output - Extends AgentOutput with plan details
+ */
+export interface PlannerAgentOutput extends AgentOutput {
+  plan: Plan;
+  alternativePlans?: Plan[]; // Alternative approaches if applicable
+  rationale: string; // Why this plan will work
+  basedOnThoughts: string[]; // IDs of thoughts this plan is based on
+}
+
+/**
+ * Plan Example stored in Pinecone (optional)
+ * 
+ * Examples that teach the Planner Agent successful planning patterns
+ */
+export interface PlanExample {
+  id: string; // Pinecone vector ID
+  query: string; // Example user query
+  embedding: number[]; // Vector embedding (for similarity calculations)
+  goal: string; // Example plan goal
+  steps: Array<{
+    description: string;
+    action: string;
+    parameters?: Record<string, any>;
+  }>; // Example plan steps
+  rationale: string; // Why this plan worked
+  successRating: number; // 0-1, how good this example is
+  tags: string[]; // Categories like ['data-query', 'facility-analysis', 'compliance']
+  createdAt: string; // ISO timestamp
+  updatedAt: string; // ISO timestamp
+  usageCount: number; // Track how often this example is matched
+}
+
+/**
  * MCP Context - Information about available MCP resources
  */
 export interface MCPContext {

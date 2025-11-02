@@ -214,3 +214,26 @@ export async function getRequestsWithComplexityDetector(): Promise<(RequestConte
   }))
 }
 
+/**
+ * Get requests with thought-agent in their agent chain
+ * 
+ * Returns requests with a plannerOutputExists boolean indicating
+ * whether planner output already exists for each request.
+ */
+export async function getRequestsWithThoughtAgent(): Promise<(RequestContext & { plannerOutputExists: boolean })[]> {
+  const response = await fetch(`${API_BASE}/with-thought-agent`)
+  
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}))
+    const errorMessage = errorData.error || `Failed to fetch requests: ${response.statusText}`
+    throw new Error(errorMessage)
+  }
+  
+  const data = await response.json()
+  // Convert date strings back to Date objects
+  return data.map((req: any) => ({
+    ...req,
+    createdAt: new Date(req.createdAt),
+  }))
+}
+

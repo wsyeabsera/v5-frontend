@@ -77,14 +77,19 @@ export abstract class BaseAgent {
       throw new Error('Agent not initialized - call initialize() first')
     }
 
-    // Use original modelId (e.g., "groq-llama"), not actualModelName (e.g., "llama-3.3-70b-versatile")
-    // The AI server knows how to resolve model IDs to actual model names
-    const modelId = this.apiConfig.modelId
+    // Use actualModelName if available (resolved by api-config-resolver), otherwise fall back to modelId
+    // This ensures the AI server gets the correct model identifier
+    const modelIdToSend = this.apiConfig.actualModelName || this.apiConfig.modelId
 
     logger.debug(`[BaseAgent] Calling LLM for agent '${this.agentId}'`, {
-      modelId,
+      modelId: modelIdToSend,
+      originalModelId: this.apiConfig.modelId,
       messageCount: messages.length
     })
+
+    // Get provider for the model to help AI server identify it correctly
+    const { getProviderForModel } = await import('@/lib/ai-config')
+    const provider = getProviderForModel(this.apiConfig.modelId)
 
     const response = await fetch(AI_SERVER_URL, {
       method: 'POST',
@@ -93,7 +98,8 @@ export abstract class BaseAgent {
       },
       body: JSON.stringify({
         messages,
-        modelId,
+        modelId: modelIdToSend,
+        provider: provider, // Include provider to help AI server resolve the model
         apiKey: this.apiConfig.apiKey,
         systemPrompt: messages.find(m => m.role === 'system')?.content,
         temperature: options.temperature ?? this.apiConfig.temperature,

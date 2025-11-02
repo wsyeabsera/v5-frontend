@@ -118,8 +118,10 @@ export class AgentConfigStorage {
         name: result.name,
         description: result.description,
         modelId: result.modelId,
+        apiKey: result.apiKey, // Include API key from MongoDB
         parameters: result.parameters || {},
         enabled: result.enabled ?? true,
+        strategyConfig: result.strategyConfig,
         createdAt: result.createdAt,
         updatedAt: result.updatedAt,
       }
@@ -143,8 +145,10 @@ export class AgentConfigStorage {
         name: result.name,
         description: result.description,
         modelId: result.modelId,
+        apiKey: result.apiKey, // Include API key from MongoDB
         parameters: result.parameters || {},
         enabled: result.enabled ?? true,
+        strategyConfig: result.strategyConfig,
         createdAt: result.createdAt,
         updatedAt: result.updatedAt,
       }))
