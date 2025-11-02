@@ -1,15 +1,19 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { ComplexityDetectorOutput } from '@/types'
+import { ComplexityDetectorOutput, AgentConfig } from '@/types'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Badge } from '@/components/ui/badge'
 import { ComplexityResult } from '@/components/complexity/ComplexityResult'
 import { getRequest } from '@/lib/api/requests-api'
-import { Sparkles, Loader2, History } from 'lucide-react'
+import { useStore } from '@/lib/store'
+import { useAgentConfigs, useModels } from '@/lib/queries'
+import { Sparkles, Loader2, History, Settings, Check } from 'lucide-react'
 import Link from 'next/link'
 
 export default function ComplexityDetectorPage() {
@@ -19,11 +23,46 @@ export default function ComplexityDetectorPage() {
   const [result, setResult] = useState<ComplexityDetectorOutput | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [useRequestId, setUseRequestId] = useState(false)
+  const [selectedAgentId, setSelectedAgentId] = useState<string>('')
+  
+  const { data: agentConfigsData } = useAgentConfigs()
+  const { data: modelsData } = useModels()
 
+  // Filter enabled agent configs
+  const enabledConfigs = (agentConfigsData || []).filter((config: AgentConfig) => config.enabled)
+  
+  // Default to complexity-detector if it exists
+  useEffect(() => {
+    if (!selectedAgentId && enabledConfigs.length > 0) {
+      const complexityDetector = enabledConfigs.find((c: AgentConfig) => c.agentId === 'complexity-detector')
+      if (complexityDetector) {
+        setSelectedAgentId('complexity-detector')
+      } else {
+        setSelectedAgentId(enabledConfigs[0].agentId)
+      }
+    }
+  }, [agentConfigsData, selectedAgentId, enabledConfigs.length])
+
+  // Get selected config
+  const selectedConfig = enabledConfigs.find((c: AgentConfig) => c.agentId === selectedAgentId)
+  
+  // Get model info for selected config
+  const models = modelsData?.models || []
+  const selectedModel = selectedConfig?.modelId 
+    ? models.find((m: any) => m.id === selectedConfig.modelId)
+    : null
+
+  // Get model test results for badge display (we still need this from store)
+  const { modelTestResults } = useStore()
 
   const handleDetect = async () => {
     if (!userQuery.trim() && !requestId.trim()) {
       setError('Please enter a query or request ID')
+      return
+    }
+
+    if (!selectedAgentId || !selectedConfig) {
+      setError('Please select an agent configuration')
       return
     }
 
@@ -32,12 +71,16 @@ export default function ComplexityDetectorPage() {
     setResult(null)
 
     try {
+      // Backend handles all API key resolution, just send agentId
       const response = await fetch('/api/agents/complexity-detector', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+        },
         body: JSON.stringify({
           userQuery: useRequestId ? undefined : userQuery,
           requestId: useRequestId ? requestId : undefined,
+          agentId: selectedAgentId,
         }),
       })
 
@@ -88,6 +131,111 @@ export default function ComplexityDetectorPage() {
             </Button>
           </Link>
         </div>
+
+        {/* Agent Config Selector */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Settings className="w-5 h-5" />
+              Agent Configuration
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="agentConfig">Select Agent Configuration</Label>
+              <Select
+                value={selectedAgentId}
+                onValueChange={setSelectedAgentId}
+                disabled={loading || enabledConfigs.length === 0}
+              >
+                <SelectTrigger id="agentConfig">
+                  <SelectValue placeholder="Select an agent configuration">
+                    {selectedConfig && (
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium">{selectedConfig.name}</span>
+                        {selectedConfig.modelId && modelTestResults[selectedConfig.modelId]?.status === 'success' && (
+                          <Badge variant="outline" className="bg-green-500/10 text-green-600 dark:text-green-400 border-green-200 dark:border-green-900">
+                            <Check className="w-3 h-3 mr-1" />
+                            Verified
+                          </Badge>
+                        )}
+                      </div>
+                    )}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {enabledConfigs.length === 0 ? (
+                    <div className="p-4 text-sm text-muted-foreground text-center">
+                      No enabled agent configurations available. Configure agents in Settings.
+                    </div>
+                  ) : (
+                    enabledConfigs.map((config: AgentConfig) => {
+                      const model = models.find((m: any) => m.id === config.modelId)
+                      const isTested = config.modelId ? modelTestResults[config.modelId]?.status === 'success' : false
+                      return (
+                        <SelectItem key={config.agentId} value={config.agentId}>
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium">{config.name}</span>
+                            {isTested && (
+                              <Badge variant="outline" className="bg-green-500/10 text-green-600 dark:text-green-400 border-green-200 dark:border-green-900 ml-auto">
+                                <Check className="w-3 h-3 mr-1" />
+                                Tested
+                              </Badge>
+                            )}
+                            {model && (
+                              <span className="text-xs text-muted-foreground">({model.provider})</span>
+                            )}
+                          </div>
+                        </SelectItem>
+                      )
+                    })
+                  )}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Choose which agent configuration to use for complexity detection. The selected config's model and parameters will be used for LLM calls.
+              </p>
+            </div>
+
+            {/* Selected Config Details */}
+            {selectedConfig && (
+              <div className="p-4 rounded-lg bg-muted/50 border border-border/50 space-y-3">
+                <div className="flex items-start justify-between">
+                  <div className="flex-1">
+                    <h4 className="font-semibold text-sm mb-1">{selectedConfig.name}</h4>
+                    <p className="text-xs text-muted-foreground">{selectedConfig.description}</p>
+                  </div>
+                  <Badge variant={selectedConfig.enabled ? 'default' : 'secondary'}>
+                    {selectedConfig.enabled ? 'Enabled' : 'Disabled'}
+                  </Badge>
+                </div>
+                {selectedModel && (
+                  <div className="flex items-center gap-2 text-sm">
+                    <span className="text-muted-foreground">Model:</span>
+                    <span className="font-medium">{selectedModel.name}</span>
+                    <span className="text-xs text-muted-foreground">({selectedModel.provider})</span>
+                  </div>
+                )}
+                {selectedConfig.parameters && (
+                  <div className="grid grid-cols-3 gap-2 text-xs pt-2 border-t border-border/40">
+                    <div>
+                      <span className="text-muted-foreground">Temperature:</span>
+                      <span className="ml-1 font-mono">{selectedConfig.parameters.temperature?.toFixed(2) || '0.30'}</span>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Max Tokens:</span>
+                      <span className="ml-1 font-mono">{selectedConfig.parameters.maxTokens || 500}</span>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Top P:</span>
+                      <span className="ml-1 font-mono">{selectedConfig.parameters.topP?.toFixed(2) || '0.90'}</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
         {/* Input Section */}
         <Card>
@@ -145,7 +293,7 @@ export default function ComplexityDetectorPage() {
 
             <Button
               onClick={handleDetect}
-              disabled={loading || (!userQuery.trim() && !requestId.trim())}
+              disabled={loading || (!userQuery.trim() && !requestId.trim()) || !selectedAgentId || !selectedConfig}
               className="w-full gap-2"
             >
               {loading ? (

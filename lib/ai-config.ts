@@ -62,7 +62,7 @@ export const AI_MODELS = {
   },
   'ollama-mistral': {
     provider: 'ollama',
-    model: 'mistral',
+    model: 'mistral:latest',
     maxTokens: 4096,
   },
   'ollama-codellama': {

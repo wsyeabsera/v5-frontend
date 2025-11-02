@@ -130,17 +130,17 @@ export function ModelSelector() {
                     <div className={`font-semibold text-sm ${!isWorking ? 'opacity-50' : ''}`}>
                       {model.name}
                     </div>
-                    {model.description && (
+                {model.description && (
                       <div className="text-xs text-muted-foreground truncate">
-                        {model.description}
-                      </div>
-                    )}
+                    {model.description}
+                  </div>
+                )}
                   </div>
                   <div className="flex-shrink-0">
                     {getStatusBadge(model)}
                   </div>
-                </div>
-              </SelectItem>
+              </div>
+            </SelectItem>
             )
           })}
         </SelectContent>

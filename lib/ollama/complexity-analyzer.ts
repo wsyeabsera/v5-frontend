@@ -10,6 +10,7 @@
  */
 
 import { ComplexityScore } from '@/types'
+import { logger } from '@/utils/logger'
 
 const AI_SERVER_URL = process.env.AI_SERVER_URL || 'http://localhost:3002/stream'
 const USE_LLM_COMPLEXITY = process.env.USE_LLM_COMPLEXITY !== 'false' // Default: true
@@ -20,6 +21,9 @@ const USE_LLM_COMPLEXITY = process.env.USE_LLM_COMPLEXITY !== 'false' // Default
 export interface ApiConfig {
   modelId: string
   apiKey: string
+  temperature?: number
+  maxTokens?: number
+  topP?: number
 }
 
 /**
@@ -128,6 +132,22 @@ Always respond with ONLY valid JSON in this exact format:
 
 Analyze this query and provide your response as JSON only.`
 
+    // Get actual model name from config (e.g., "ollama-mistral" -> "mistral:latest")
+    let actualModelId = apiConfig.modelId
+    try {
+      const { getModelConfig } = await import('@/lib/ai-config')
+      const modelConfig = getModelConfig(apiConfig.modelId)
+      if (modelConfig && modelConfig.model) {
+        actualModelId = modelConfig.model
+        logger.info(`[Complexity Analyzer] Converted modelId "${apiConfig.modelId}" -> "${actualModelId}"`)
+      }
+    } catch (e) {
+      logger.warn(`[Complexity Analyzer] Failed to get model config:`, e)
+      // Fallback to original modelId if import fails
+    }
+
+    logger.debug(`[Complexity Analyzer] Calling AI server: modelId="${actualModelId}", provider="${apiConfig.apiKey?.startsWith('http') ? 'ollama' : 'api'}"`)
+
     // Call AI server
     const response = await fetch(AI_SERVER_URL, {
       method: 'POST',
@@ -139,9 +159,12 @@ Analyze this query and provide your response as JSON only.`
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userMessage },
         ],
-        modelId: apiConfig.modelId,
+        modelId: actualModelId,
         apiKey: apiConfig.apiKey,
         systemPrompt,
+        temperature: apiConfig.temperature,
+        maxTokens: apiConfig.maxTokens,
+        topP: apiConfig.topP,
       }),
     })
 
@@ -225,6 +248,18 @@ Provide a clear, concise explanation (2-3 sentences) that helps users understand
 
 Return ONLY the explanation text, no JSON or formatting.`
 
+    // Get actual model name from config (e.g., "ollama-mistral" -> "mistral")
+    let actualModelId = apiConfig.modelId
+    try {
+      const { getModelConfig } = await import('@/lib/ai-config')
+      const modelConfig = getModelConfig(apiConfig.modelId)
+      if (modelConfig && modelConfig.model) {
+        actualModelId = modelConfig.model
+      }
+    } catch (e) {
+      // Fallback to original modelId if import fails
+    }
+
     // Call AI server
     const response = await fetch(AI_SERVER_URL, {
       method: 'POST',
@@ -236,9 +271,12 @@ Return ONLY the explanation text, no JSON or formatting.`
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userMessage },
         ],
-        modelId: apiConfig.modelId,
+        modelId: actualModelId,
         apiKey: apiConfig.apiKey,
         systemPrompt,
+        temperature: apiConfig.temperature,
+        maxTokens: apiConfig.maxTokens,
+        topP: apiConfig.topP,
       }),
     })
 
@@ -252,7 +290,7 @@ Return ONLY the explanation text, no JSON or formatting.`
     return explanation.trim()
   } catch (error: any) {
     // Fall back to simple explanation if LLM fails
-    console.warn('[Complexity Analyzer] Failed to generate LLM explanation, using fallback:', error.message)
+    logger.warn('[Complexity Analyzer] Failed to generate LLM explanation, using fallback:', error.message)
     return generateFallbackExplanation(userQuery, complexity)
   }
 }
@@ -282,16 +320,23 @@ function generateFallbackExplanation(
  * @param semanticScore - Semantic detection score
  * @param keywordScore - Keyword detection score
  * @param similarity - Semantic similarity (if available)
+ * @param preferLLM - If true, prefer LLM over keyword/semantic (when agent config is provided)
  * @returns true if LLM should be consulted
  */
 export function shouldUseLLM(
   userQuery: string,
   semanticScore?: number,
   keywordScore?: number,
-  similarity?: number
+  similarity?: number,
+  preferLLM?: boolean
 ): boolean {
   if (!USE_LLM_COMPLEXITY) {
     return false
+  }
+
+  // If preferLLM is true (agent config provided), use LLM for better accuracy
+  if (preferLLM) {
+    return true
   }
 
   // Check for significant score difference

@@ -90,16 +90,16 @@ export function ApiKeyInput({ provider, label, placeholder }: ApiKeyInputProps) 
             className="pr-20 h-10 font-mono text-sm border-border/60 focus:border-primary/50 transition-colors"
           />
           <div className="absolute right-1 top-1/2 -translate-y-1/2 flex gap-0.5">
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
               className="h-8 w-8 p-0 hover:bg-muted/50"
-              onClick={() => setShow(!show)}
-              aria-label={show ? 'Hide key' : 'Show key'}
-            >
+            onClick={() => setShow(!show)}
+            aria-label={show ? 'Hide key' : 'Show key'}
+          >
               {show ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-            </Button>
+          </Button>
           </div>
         </div>
         <Button 

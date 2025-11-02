@@ -219,3 +219,46 @@ export interface ComplexityDetectorOutput extends AgentOutput {
   llmConfidence?: number; // Confidence score from LLM analysis (0.0-1.0)
 }
 
+/**
+ * Agent Parameters - Configurable parameters for AI model calls
+ */
+export interface AgentParameters {
+  temperature?: number; // 0-1, controls randomness
+  maxTokens?: number; // Maximum tokens in response
+  topP?: number; // 0-1, nucleus sampling parameter
+  [key: string]: any; // Extensible for agent-specific params
+}
+
+/**
+ * Strategy Configuration - Configurable detection strategies per agent
+ */
+export interface StrategyConfig {
+  enabled: string[]; // Enabled strategy names (e.g., ['semantic', 'keyword', 'llm'])
+  fallbackOrder?: string[]; // Order to try strategies if first fails
+  semantic?: {
+    threshold?: number; // Similarity threshold (default: 0.75)
+  };
+  keyword?: {
+    useWhen?: 'always' | 'fallback'; // When to use keyword strategy
+  };
+  llm?: {
+    useWhen?: 'always' | 'conflict' | 'ambiguous'; // When to use LLM
+  };
+}
+
+/**
+ * Agent Configuration - AI configuration for each agent
+ */
+export interface AgentConfig {
+  _id?: string; // MongoDB document ID
+  agentId: string; // Unique agent identifier (e.g., 'complexity-detector')
+  name: string; // Display name
+  description: string; // What this agent does
+  modelId: string; // Selected model from settings (e.g., 'claude-sonnet')
+  parameters: AgentParameters; // Model parameters
+  enabled: boolean; // Whether agent is active
+  strategyConfig?: StrategyConfig; // Optional: Strategy configuration for detection methods
+  createdAt?: string; // ISO timestamp
+  updatedAt?: string; // ISO timestamp
+}
+

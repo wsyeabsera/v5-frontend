@@ -3,7 +3,8 @@ import { ApiKeyInput } from '@/components/settings/ApiKeyInput'
 import { OllamaConfig } from '@/components/settings/OllamaConfig'
 import { ModelTestList } from '@/components/settings/ModelTestList'
 import { StorageDebug } from '@/components/settings/StorageDebug'
-import { Key, Sparkles, Info, Server, TestTube, Settings as SettingsIcon, Cog, CheckSquare } from 'lucide-react'
+import { AgentConfigList } from '@/components/settings/AgentConfigList'
+import { Key, Sparkles, Info, Server, TestTube, Settings as SettingsIcon, Cog, CheckSquare, Bot } from 'lucide-react'
 import { Card } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 
@@ -26,7 +27,7 @@ export default function SettingsPage() {
         </div>
 
         <Tabs defaultValue="configuration" className="w-full">
-          <TabsList className="grid w-full max-w-md grid-cols-3 mb-6">
+          <TabsList className="grid w-full max-w-2xl grid-cols-4 mb-6">
             <TabsTrigger value="configuration" className="gap-2">
               <Cog className="w-4 h-4" />
               Configuration
@@ -39,6 +40,10 @@ export default function SettingsPage() {
               <CheckSquare className="w-4 h-4" />
               Selection
             </TabsTrigger>
+            <TabsTrigger value="agents" className="gap-2">
+              <Bot className="w-4 h-4" />
+              Agents
+            </TabsTrigger>
           </TabsList>
 
           {/* Configuration Tab */}
@@ -49,46 +54,46 @@ export default function SettingsPage() {
                 <div className="flex items-center gap-3">
                   <div className="p-2 rounded-lg bg-blue-500/10">
                     <Key className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-                  </div>
+          </div>
                   <div>
                     <h3 className="font-semibold text-lg">API Keys</h3>
                     <p className="text-xs text-muted-foreground">Configure your API credentials</p>
-                  </div>
-                </div>
-                
+        </div>
+          </div>
+          
                 <div className="flex items-start gap-3 p-4 rounded-lg bg-gradient-to-r from-blue-50 to-transparent dark:from-blue-950/20 border border-blue-200/50 dark:border-blue-900/30">
                   <Info className="w-4 h-4 mt-0.5 text-blue-600 dark:text-blue-400 flex-shrink-0" />
                   <p className="text-xs text-muted-foreground leading-relaxed">
-                    Your API keys are stored locally in your browser and never sent to our servers.
-                  </p>
-                </div>
-                
+              Your API keys are stored locally in your browser and never sent to our servers.
+            </p>
+          </div>
+          
                 <div className="space-y-4">
-                  <ApiKeyInput
-                    provider="anthropic"
-                    label="Anthropic API Key"
-                    placeholder="sk-ant-..."
-                  />
-                  <ApiKeyInput
-                    provider="openai"
-                    label="OpenAI API Key"
-                    placeholder="sk-..."
-                  />
-                  <ApiKeyInput
-                    provider="google"
-                    label="Google API Key"
-                    placeholder="AIza..."
-                  />
-                  <ApiKeyInput
-                    provider="groq"
-                    label="Groq API Key"
-                    placeholder="gsk_..."
-                  />
-                </div>
+            <ApiKeyInput
+              provider="anthropic"
+              label="Anthropic API Key"
+              placeholder="sk-ant-..."
+            />
+            <ApiKeyInput
+              provider="openai"
+              label="OpenAI API Key"
+              placeholder="sk-..."
+            />
+            <ApiKeyInput
+              provider="google"
+              label="Google API Key"
+              placeholder="AIza..."
+            />
+            <ApiKeyInput
+              provider="groq"
+              label="Groq API Key"
+              placeholder="gsk_..."
+            />
+          </div>
 
-                {/* Debug Component */}
-                <StorageDebug />
-              </div>
+          {/* Debug Component */}
+          <StorageDebug />
+        </div>
             </Card>
 
             {/* Ollama Configuration */}
@@ -140,6 +145,24 @@ export default function SettingsPage() {
                   </div>
                 </div>
                 <ModelSelector />
+              </div>
+            </Card>
+          </TabsContent>
+
+          {/* Agents Tab */}
+          <TabsContent value="agents" className="space-y-6 mt-6">
+            <Card className="p-6 shadow-sm hover:shadow-md transition-all duration-300 border-border/50 animate-fade-in">
+              <div className="space-y-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-indigo-500/10">
+                    <Bot className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-lg">Agent Configurations</h3>
+                    <p className="text-xs text-muted-foreground">Configure AI models and parameters for each agent</p>
+                  </div>
+                </div>
+                <AgentConfigList />
               </div>
             </Card>
           </TabsContent>

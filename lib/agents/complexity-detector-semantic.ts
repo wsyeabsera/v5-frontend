@@ -134,11 +134,13 @@ export async function detectComplexitySemantic(
       } else {
         // Semantic match seems off (different complexity score from keyword detection)
         // Check if we should use LLM as tie-breaker
+        // Prefer LLM if apiConfig is provided (agent config is set up)
         const shouldConsultLLM = shouldUseLLM(
           userQuery,
           semanticComplexity.score,
           keywordComplexity.score,
-          bestMatch.similarity
+          bestMatch.similarity,
+          !!apiConfig // Prefer LLM when agent config is provided
         )
 
         if (shouldConsultLLM) {
@@ -187,11 +189,13 @@ export async function detectComplexitySemantic(
       }
     } else {
       // No good semantic match - check if we should use LLM for ambiguous queries
+      // Prefer LLM if apiConfig is provided (agent config is set up)
       const shouldConsultLLM = shouldUseLLM(
         userQuery,
         undefined,
         keywordComplexity.score,
-        similarExamples.length > 0 ? similarExamples[0].similarity : undefined
+        similarExamples.length > 0 ? similarExamples[0].similarity : undefined,
+        !!apiConfig // Prefer LLM when agent config is provided
       )
 
       if (shouldConsultLLM) {

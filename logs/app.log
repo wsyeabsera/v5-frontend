@@ -1,0 +1,95 @@
+[2025-11-02T18:20:20.393Z] [INFO] [Complexity Detector] Starting detection [{"query":"list all facilities","agentId":"complexity-detector","hasApiConfig":false}]
+[2025-11-02T18:20:20.395Z] [DEBUG] Resolved Ollama URL [{"source":"env","url":"http://localhost:11434..."}]
+[2025-11-02T18:20:20.395Z] [INFO] Resolved API config for agent 'complexity-detector' [{"modelId":"ollama-mistral","provider":"ollama","actualModelName":"mistral:latest","hasParams":true}]
+[2025-11-02T18:20:20.395Z] [DEBUG] [Complexity Detector] Trying strategy: semantic
+[2025-11-02T18:20:20.396Z] [DEBUG] [Semantic Strategy] Starting semantic detection for query: "list all facilities..."
+[2025-11-02T18:20:23.193Z] [DEBUG] [Semantic Strategy] No semantic match found [{"bestSimilarity":"0.000","threshold":0.75,"resultsCount":0}]
+[2025-11-02T18:20:23.193Z] [WARN] [Semantic Strategy] Semantic detection failed [{"error":"No semantic match found (best similarity: 0.000, threshold: 0.75)","query":"list all facilities"}]
+[2025-11-02T18:20:23.193Z] [DEBUG] [Complexity Detector] Strategy semantic failed: ["No semantic match found (best similarity: 0.000, threshold: 0.75)"]
+[2025-11-02T18:20:23.193Z] [DEBUG] [Complexity Detector] Trying strategy: keyword
+[2025-11-02T18:20:23.193Z] [DEBUG] [Keyword Strategy] Starting keyword detection for query: "list all facilities..."
+[2025-11-02T18:20:23.193Z] [INFO] [Keyword Strategy] Detection complete [{"score":"0.186","passes":1,"keywordsCount":2}]
+[2025-11-02T18:20:23.206Z] [INFO] [Complexity Detector] Detection complete [{"method":"keyword","score":"0.186","passes":1,"requestId":"c734b888-c666-486b-935a-bfa60fcd379d"}]
+[2025-11-02T18:20:23.206Z] [INFO] [Complexity Detector API] Detection completed [{"requestId":"c734b888-c666-486b-935a-bfa60fcd379d","method":"keyword","score":"0.186"}]
+[2025-11-02T18:22:03.038Z] [INFO] [Complexity Detector] Starting detection [{"query":"analyze facility performance and generate comprehe","agentId":"complexity-detector","hasApiConfig":false}]
+[2025-11-02T18:22:03.040Z] [DEBUG] Resolved Ollama URL [{"source":"env","url":"http://localhost:11434..."}]
+[2025-11-02T18:22:03.041Z] [INFO] Resolved API config for agent 'complexity-detector' [{"modelId":"ollama-mistral","provider":"ollama","actualModelName":"mistral:latest","hasParams":true}]
+[2025-11-02T18:22:03.041Z] [DEBUG] [Complexity Detector] Trying strategy: semantic
+[2025-11-02T18:22:03.041Z] [DEBUG] [Semantic Strategy] Starting semantic detection for query: "analyze facility performance and generate comprehe..."
+[2025-11-02T18:22:03.762Z] [DEBUG] [Semantic Strategy] No semantic match found [{"bestSimilarity":"0.000","threshold":0.75,"resultsCount":0}]
+[2025-11-02T18:22:03.762Z] [WARN] [Semantic Strategy] Semantic detection failed [{"error":"No semantic match found (best similarity: 0.000, threshold: 0.75)","query":"analyze facility performance and generate comprehe"}]
+[2025-11-02T18:22:03.763Z] [DEBUG] [Complexity Detector] Strategy semantic failed: ["No semantic match found (best similarity: 0.000, threshold: 0.75)"]
+[2025-11-02T18:22:03.763Z] [DEBUG] [Complexity Detector] Trying strategy: keyword
+[2025-11-02T18:22:03.764Z] [DEBUG] [Keyword Strategy] Starting keyword detection for query: "analyze facility performance and generate comprehe..."
+[2025-11-02T18:22:03.764Z] [INFO] [Keyword Strategy] Detection complete [{"score":"0.548","passes":2,"keywordsCount":7}]
+[2025-11-02T18:22:03.770Z] [INFO] [Complexity Detector] Detection complete [{"method":"keyword","score":"0.548","passes":2,"requestId":"a97aed9b-76b4-4bfd-a5f0-f5e93d736e99"}]
+[2025-11-02T18:22:03.770Z] [INFO] [Complexity Detector API] Detection completed [{"requestId":"a97aed9b-76b4-4bfd-a5f0-f5e93d736e99","method":"keyword","score":"0.548"}]
+[2025-11-02T18:22:11.934Z] [INFO] [Complexity Detector] Starting detection [{"query":"test query with agent config","agentId":"complexity-detector","hasApiConfig":false}]
+[2025-11-02T18:22:11.936Z] [DEBUG] Resolved Ollama URL [{"source":"env","url":"http://localhost:11434..."}]
+[2025-11-02T18:22:11.936Z] [INFO] Resolved API config for agent 'complexity-detector' [{"modelId":"ollama-mistral","provider":"ollama","actualModelName":"mistral:latest","hasParams":true}]
+[2025-11-02T18:22:11.936Z] [DEBUG] [Complexity Detector] Trying strategy: semantic
+[2025-11-02T18:22:11.936Z] [DEBUG] [Semantic Strategy] Starting semantic detection for query: "test query with agent config..."
+[2025-11-02T18:22:12.549Z] [DEBUG] [Semantic Strategy] No semantic match found [{"bestSimilarity":"0.000","threshold":0.75,"resultsCount":0}]
+[2025-11-02T18:22:12.550Z] [WARN] [Semantic Strategy] Semantic detection failed [{"error":"No semantic match found (best similarity: 0.000, threshold: 0.75)","query":"test query with agent config"}]
+[2025-11-02T18:22:12.550Z] [DEBUG] [Complexity Detector] Strategy semantic failed: ["No semantic match found (best similarity: 0.000, threshold: 0.75)"]
+[2025-11-02T18:22:12.550Z] [DEBUG] [Complexity Detector] Trying strategy: keyword
+[2025-11-02T18:22:12.550Z] [DEBUG] [Keyword Strategy] Starting keyword detection for query: "test query with agent config..."
+[2025-11-02T18:22:12.551Z] [INFO] [Keyword Strategy] Detection complete [{"score":"0.008","passes":1,"keywordsCount":0}]
+[2025-11-02T18:22:12.556Z] [INFO] [Complexity Detector] Detection complete [{"method":"keyword","score":"0.008","passes":1,"requestId":"ac4a5f02-9707-40f4-93b6-45e3621d4431"}]
+[2025-11-02T18:22:12.557Z] [INFO] [Complexity Detector API] Detection completed [{"requestId":"ac4a5f02-9707-40f4-93b6-45e3621d4431","method":"keyword","score":"0.008"}]
+[2025-11-02T18:25:36.207Z] [INFO] [Complexity Detector] Starting detection [{"query":"analyze all facilities and generate comprehensive ","agentId":"complexity-detector","hasApiConfig":false}]
+[2025-11-02T18:25:36.225Z] [DEBUG] Resolved Ollama URL [{"source":"env","url":"http://localhost:11434..."}]
+[2025-11-02T18:25:36.225Z] [INFO] Resolved API config for agent 'complexity-detector' [{"modelId":"ollama-mistral","provider":"ollama","actualModelName":"mistral:latest","hasParams":true}]
+[2025-11-02T18:25:36.225Z] [DEBUG] [Complexity Detector] Trying strategy: semantic
+[2025-11-02T18:25:36.225Z] [DEBUG] [Semantic Strategy] Starting semantic detection for query: "analyze all facilities and generate comprehensive ..."
+[2025-11-02T18:25:39.409Z] [DEBUG] [Semantic Strategy] No semantic match found [{"bestSimilarity":"0.000","threshold":0.75,"resultsCount":0}]
+[2025-11-02T18:25:39.409Z] [WARN] [Semantic Strategy] Semantic detection failed [{"error":"No semantic match found (best similarity: 0.000, threshold: 0.75)","query":"analyze all facilities and generate comprehensive "}]
+[2025-11-02T18:25:39.409Z] [DEBUG] [Complexity Detector] Strategy semantic failed: ["No semantic match found (best similarity: 0.000, threshold: 0.75)"]
+[2025-11-02T18:25:39.410Z] [DEBUG] [Complexity Detector] Trying strategy: keyword
+[2025-11-02T18:25:39.410Z] [DEBUG] [Keyword Strategy] Starting keyword detection for query: "analyze all facilities and generate comprehensive ..."
+[2025-11-02T18:25:39.410Z] [INFO] [Keyword Strategy] Detection complete [{"score":"0.541","passes":2,"keywordsCount":8}]
+[2025-11-02T18:25:39.411Z] [DEBUG] [Complexity Detector] Keyword strategy completed, score: 0.541
+[2025-11-02T18:25:39.417Z] [INFO] [Complexity Detector] Detection complete [{"method":"keyword","score":"0.541","passes":2,"requestId":"768d3348-51c9-43c8-8009-bc47f44bfa40"}]
+[2025-11-02T18:25:39.417Z] [INFO] [Complexity Detector API] Detection completed [{"requestId":"768d3348-51c9-43c8-8009-bc47f44bfa40","method":"keyword","score":"0.541"}]
+[2025-11-02T18:26:24.753Z] [INFO] [Complexity Detector] Starting detection [{"query":"analyze all facilities and generate comprehensive ","agentId":"complexity-detector","hasApiConfig":false}]
+[2025-11-02T18:26:24.767Z] [DEBUG] Resolved Ollama URL [{"source":"env","url":"http://localhost:11434..."}]
+[2025-11-02T18:26:24.767Z] [INFO] Resolved API config for agent 'complexity-detector' [{"modelId":"ollama-mistral","provider":"ollama","actualModelName":"mistral:latest","hasParams":true}]
+[2025-11-02T18:26:24.767Z] [DEBUG] [Complexity Detector] Trying strategy: semantic
+[2025-11-02T18:26:24.767Z] [DEBUG] [Semantic Strategy] Starting semantic detection for query: "analyze all facilities and generate comprehensive ..."
+[2025-11-02T18:26:26.314Z] [DEBUG] [Semantic Strategy] No semantic match found [{"bestSimilarity":"0.000","threshold":0.75,"resultsCount":0}]
+[2025-11-02T18:26:26.314Z] [WARN] [Semantic Strategy] Semantic detection failed [{"error":"No semantic match found (best similarity: 0.000, threshold: 0.75)","query":"analyze all facilities and generate comprehensive "}]
+[2025-11-02T18:26:26.315Z] [DEBUG] [Complexity Detector] Strategy semantic failed: ["No semantic match found (best similarity: 0.000, threshold: 0.75)"]
+[2025-11-02T18:26:26.315Z] [DEBUG] [Complexity Detector] Trying strategy: keyword
+[2025-11-02T18:26:26.316Z] [DEBUG] [Keyword Strategy] Starting keyword detection for query: "analyze all facilities and generate comprehensive ..."
+[2025-11-02T18:26:26.316Z] [INFO] [Keyword Strategy] Detection complete [{"score":"0.541","passes":2,"keywordsCount":8}]
+[2025-11-02T18:26:26.317Z] [DEBUG] [Complexity Detector] Keyword strategy completed, score: 0.541
+[2025-11-02T18:26:26.317Z] [DEBUG] [Complexity Detector] LLM strategy check [{"hasStrategy":true,"canUse":true,"enabled":true,"hasApiConfig":true,"semanticResult":false,"keywordResult":true}]
+[2025-11-02T18:26:26.317Z] [DEBUG] [Complexity Detector] Semantic failed but keyword succeeded - treating as ambiguous, running LLM
+[2025-11-02T18:26:26.317Z] [DEBUG] [Complexity Detector] Trying LLM strategy
+[2025-11-02T18:26:26.317Z] [DEBUG] [LLM Strategy] Starting LLM analysis for query: "analyze all facilities and generate comprehensive ..."
+[2025-11-02T18:26:26.317Z] [DEBUG] [LLM Strategy] Calling AI server [{"modelId":"mistral:latest","provider":"ollama"}]
+[2025-11-02T18:26:26.351Z] [ERROR] [LLM Strategy] LLM analysis failed [{"error":"AI server error: 400 - {\"error\":\"Unknown model: mistral:latest\"}","query":"analyze all facilities and generate comprehensive "}]
+[2025-11-02T18:26:26.351Z] [DEBUG] [Complexity Detector] LLM strategy failed: ["Failed to analyze complexity with LLM: AI server error: 400 - {\"error\":\"Unknown model: mistral:latest\"}"]
+[2025-11-02T18:26:26.355Z] [INFO] [Complexity Detector] Detection complete [{"method":"keyword","score":"0.541","passes":2,"requestId":"40150206-4b82-48f8-82f8-f3d1aa16fe1c"}]
+[2025-11-02T18:26:26.355Z] [INFO] [Complexity Detector API] Detection completed [{"requestId":"40150206-4b82-48f8-82f8-f3d1aa16fe1c","method":"keyword","score":"0.541"}]
+[2025-11-02T18:33:17.388Z] [INFO] [Complexity Detector] Starting detection [{"query":"list contracts","agentId":"complexity-detector","hasApiConfig":false}]
+[2025-11-02T18:33:17.402Z] [DEBUG] Resolved Ollama URL [{"source":"env","url":"http://localhost:11434..."}]
+[2025-11-02T18:33:17.402Z] [INFO] Resolved API config for agent 'complexity-detector' [{"modelId":"ollama-mistral","provider":"ollama","actualModelName":"mistral:latest","hasParams":true}]
+[2025-11-02T18:33:17.402Z] [DEBUG] [Complexity Detector] Trying strategy: semantic
+[2025-11-02T18:33:17.402Z] [DEBUG] [Semantic Strategy] Starting semantic detection for query: "list contracts..."
+[2025-11-02T18:33:20.844Z] [DEBUG] [Semantic Strategy] No semantic match found [{"bestSimilarity":"0.000","threshold":0.75,"resultsCount":0}]
+[2025-11-02T18:33:20.845Z] [WARN] [Semantic Strategy] Semantic detection failed [{"error":"No semantic match found (best similarity: 0.000, threshold: 0.75)","query":"list contracts"}]
+[2025-11-02T18:33:20.845Z] [DEBUG] [Complexity Detector] Strategy semantic failed: ["No semantic match found (best similarity: 0.000, threshold: 0.75)"]
+[2025-11-02T18:33:20.846Z] [DEBUG] [Complexity Detector] Trying strategy: keyword
+[2025-11-02T18:33:20.846Z] [DEBUG] [Keyword Strategy] Starting keyword detection for query: "list contracts..."
+[2025-11-02T18:33:20.847Z] [INFO] [Keyword Strategy] Detection complete [{"score":"0.064","passes":1,"keywordsCount":2}]
+[2025-11-02T18:33:20.847Z] [DEBUG] [Complexity Detector] Keyword strategy completed, score: 0.064
+[2025-11-02T18:33:20.848Z] [DEBUG] [Complexity Detector] LLM strategy check [{"hasStrategy":true,"canUse":true,"enabled":true,"hasApiConfig":true,"semanticResult":false,"keywordResult":true}]
+[2025-11-02T18:33:20.848Z] [DEBUG] [Complexity Detector] Semantic failed but keyword succeeded - treating as ambiguous, running LLM
+[2025-11-02T18:33:20.848Z] [DEBUG] [Complexity Detector] Trying LLM strategy
+[2025-11-02T18:33:20.849Z] [DEBUG] [LLM Strategy] Starting LLM analysis for query: "list contracts..."
+[2025-11-02T18:33:20.849Z] [DEBUG] [LLM Strategy] Calling AI server [{"modelId":"mistral:latest","provider":"ollama"}]
+[2025-11-02T18:33:20.863Z] [ERROR] [LLM Strategy] LLM analysis failed [{"error":"AI server error: 400 - {\"error\":\"Unknown model: mistral:latest\"}","query":"list contracts"}]
+[2025-11-02T18:33:20.863Z] [DEBUG] [Complexity Detector] LLM strategy failed: ["Failed to analyze complexity with LLM: AI server error: 400 - {\"error\":\"Unknown model: mistral:latest\"}"]
+[2025-11-02T18:33:20.878Z] [INFO] [Complexity Detector] Detection complete [{"method":"keyword","score":"0.064","passes":1,"requestId":"3ec276db-cf16-4bd4-8b2b-276a6c41196a"}]
+[2025-11-02T18:33:20.878Z] [INFO] [Complexity Detector API] Detection completed [{"requestId":"3ec276db-cf16-4bd4-8b2b-276a6c41196a","method":"keyword","score":"0.064"}]
