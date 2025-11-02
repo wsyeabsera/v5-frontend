@@ -1,6 +1,6 @@
 'use client'
 
-import { Home, MessageSquare, Settings, ChevronLeft, ChevronRight, List } from 'lucide-react'
+import { Home, MessageSquare, Settings, ChevronLeft, ChevronRight, List, Sparkles, Database } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useState } from 'react'
@@ -11,6 +11,8 @@ const navigation = [
   { name: 'Dashboard', href: '/', icon: Home },
   { name: 'Chat', href: '/chat', icon: MessageSquare },
   { name: 'Requests', href: '/requests', icon: List },
+  { name: 'Complexity Detector', href: '/agents/complexity-detector', icon: Sparkles },
+  { name: 'Complexity Examples', href: '/agents/complexity-examples', icon: Database },
   { name: 'Settings', href: '/settings', icon: Settings },
 ]
 
@@ -42,7 +44,7 @@ export function Sidebar() {
         {/* Navigation */}
         <nav className={`flex-1 space-y-0.5 ${collapsed ? 'px-1.5 py-3' : 'px-2 py-3'}`}>
           {navigation.map((item) => {
-            const isActive = pathname === item.href
+            const isActive = pathname === item.href || (item.href !== '/' && pathname.startsWith(item.href))
             const Icon = item.icon
 
             return (

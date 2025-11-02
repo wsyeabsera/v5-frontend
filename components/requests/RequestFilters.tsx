@@ -10,7 +10,7 @@ import { Search, X } from 'lucide-react'
 export interface RequestFiltersState {
   search: string
   status: RequestContext['status'] | 'all'
-  agentName: string
+  agentName: string | 'all'
 }
 
 interface RequestFiltersProps {
@@ -35,12 +35,12 @@ export function RequestFilters({
     onFiltersChange({
       search: '',
       status: 'all',
-      agentName: '',
+      agentName: 'all',
     })
   }
 
   const hasActiveFilters =
-    filters.search !== '' || filters.status !== 'all' || filters.agentName !== ''
+    filters.search !== '' || filters.status !== 'all' || (filters.agentName !== '' && filters.agentName !== 'all')
 
   return (
     <div className="space-y-4">
@@ -84,7 +84,7 @@ export function RequestFilters({
               <SelectValue placeholder="Agent" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">All Agents</SelectItem>
+              <SelectItem value="all">All Agents</SelectItem>
               {availableAgents.map((agent) => (
                 <SelectItem key={agent} value={agent}>
                   {agent}

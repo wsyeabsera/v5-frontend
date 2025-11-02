@@ -141,10 +141,34 @@ export const apiClient = {
           description: 'Fast and intelligent AI model',
         },
         {
+          id: 'claude-opus',
+          name: 'Claude Opus',
+          provider: 'anthropic',
+          description: 'Most capable Anthropic model',
+        },
+        {
+          id: 'claude-haiku',
+          name: 'Claude Haiku',
+          provider: 'anthropic',
+          description: 'Fast and cost-effective AI model',
+        },
+        {
           id: 'gpt-4',
           name: 'GPT-4',
           provider: 'openai',
           description: 'Powerful language model',
+        },
+        {
+          id: 'gpt-4-turbo',
+          name: 'GPT-4 Turbo',
+          provider: 'openai',
+          description: 'Enhanced GPT-4 model',
+        },
+        {
+          id: 'gpt-3.5-turbo',
+          name: 'GPT-3.5 Turbo',
+          provider: 'openai',
+          description: 'Fast and efficient GPT model',
         },
         {
           id: 'gemini-pro',
@@ -163,6 +187,24 @@ export const apiClient = {
           name: 'Mixtral 8x7B (Groq)',
           provider: 'groq',
           description: 'High-performance mixture of experts',
+        },
+        {
+          id: 'ollama-llama3',
+          name: 'Llama 3 (Ollama)',
+          provider: 'ollama',
+          description: 'Local Llama 3 inference',
+        },
+        {
+          id: 'ollama-mistral',
+          name: 'Mistral (Ollama)',
+          provider: 'ollama',
+          description: 'Local Mistral inference',
+        },
+        {
+          id: 'ollama-codellama',
+          name: 'Code Llama (Ollama)',
+          provider: 'ollama',
+          description: 'Local Code Llama inference',
         },
       ],
     }

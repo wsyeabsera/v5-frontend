@@ -53,10 +53,27 @@ export const AI_MODELS = {
     model: 'mixtral-8x7b-32768',
     maxTokens: 32768,
   },
+  
+  // Ollama Models (local inference)
+  'ollama-llama3': {
+    provider: 'ollama',
+    model: 'llama3',
+    maxTokens: 4096,
+  },
+  'ollama-mistral': {
+    provider: 'ollama',
+    model: 'mistral',
+    maxTokens: 4096,
+  },
+  'ollama-codellama': {
+    provider: 'ollama',
+    model: 'codellama',
+    maxTokens: 4096,
+  },
 } as const
 
 export type ModelId = keyof typeof AI_MODELS
-export type Provider = 'anthropic' | 'openai' | 'google' | 'groq'
+export type Provider = 'anthropic' | 'openai' | 'google' | 'groq' | 'ollama'
 
 export function getProviderForModel(modelId: string): Provider {
   const model = AI_MODELS[modelId as ModelId]

@@ -1,11 +1,13 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
+import { ModelTestResult } from '@/types'
 
 interface ApiKeys {
   anthropic?: string
   openai?: string
   google?: string
   groq?: string
+  ollama?: string
 }
 
 interface Model {
@@ -24,6 +26,16 @@ interface AppState {
   apiKeys: ApiKeys
   setApiKey: (provider: keyof ApiKeys, key: string) => void
   clearApiKeys: () => void
+
+  // Ollama configuration
+  ollamaUrl: string
+  setOllamaUrl: (url: string) => void
+  ollamaModel: string
+  setOllamaModel: (model: string) => void
+
+  // Model test results (keyed by modelId)
+  modelTestResults: Record<string, ModelTestResult>
+  setModelTestResult: (modelId: string, result: ModelTestResult) => void
 
   // UI State
   sidebarOpen: boolean
@@ -49,6 +61,19 @@ export const useStore = create<AppState>()(
         })),
       clearApiKeys: () => set({ apiKeys: {} }),
 
+      // Ollama configuration
+      ollamaUrl: 'http://localhost:11434',
+      setOllamaUrl: (url) => set({ ollamaUrl: url }),
+      ollamaModel: '',
+      setOllamaModel: (model) => set({ ollamaModel: model }),
+
+      // Model test results
+      modelTestResults: {},
+      setModelTestResult: (provider, result) =>
+        set((state) => ({
+          modelTestResults: { ...state.modelTestResults, [provider]: result },
+        })),
+
       // UI State
       sidebarOpen: true,
       toggleSidebar: () => set((state) => ({ sidebarOpen: !state.sidebarOpen })),
@@ -63,6 +88,8 @@ export const useStore = create<AppState>()(
         // Only persist these fields
         selectedModel: state.selectedModel,
         apiKeys: state.apiKeys,
+        ollamaUrl: state.ollamaUrl,
+        ollamaModel: state.ollamaModel,
         sidebarOpen: state.sidebarOpen,
       }),
     }

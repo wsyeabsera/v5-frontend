@@ -1,8 +1,9 @@
 import { ModelSelector } from '@/components/settings/ModelSelector'
 import { ApiKeyInput } from '@/components/settings/ApiKeyInput'
+import { OllamaConfig } from '@/components/settings/OllamaConfig'
+import { ModelTestList } from '@/components/settings/ModelTestList'
 import { StorageDebug } from '@/components/settings/StorageDebug'
-import { Card } from '@/components/ui/card'
-import { Key, Sparkles, Info } from 'lucide-react'
+import { Key, Sparkles, Info, Server, TestTube } from 'lucide-react'
 
 export default function SettingsPage() {
   return (
@@ -15,20 +16,8 @@ export default function SettingsPage() {
           </p>
         </div>
 
-        {/* Model Selection */}
-        <div className="space-y-3 pb-6 border-b border-border/40 dark:border-border/20">
-          <div className="flex items-center gap-2">
-            <Sparkles className="w-4 h-4 text-primary" />
-            <h3 className="font-medium">AI Model</h3>
-          </div>
-          <p className="text-[13px] text-muted-foreground">
-            Choose your preferred language model
-          </p>
-          <ModelSelector />
-        </div>
-
         {/* API Keys */}
-        <div className="space-y-3">
+        <div className="space-y-3 pb-6 border-b border-border/40 dark:border-border/20">
           <div className="flex items-center gap-2">
             <Key className="w-4 h-4 text-primary" />
             <h3 className="font-medium">API Keys</h3>
@@ -66,6 +55,42 @@ export default function SettingsPage() {
 
           {/* Debug Component */}
           <StorageDebug />
+        </div>
+
+        {/* Ollama Configuration */}
+        <div className="space-y-3 pb-6 border-b border-border/40 dark:border-border/20">
+          <div className="flex items-center gap-2">
+            <Server className="w-4 h-4 text-primary" />
+            <h3 className="font-medium">Ollama Configuration</h3>
+          </div>
+          <p className="text-[13px] text-muted-foreground">
+            Configure your local Ollama server and models
+          </p>
+          <OllamaConfig />
+        </div>
+
+        {/* Model Testing */}
+        <div className="space-y-3 pb-6 border-b border-border/40 dark:border-border/20">
+          <div className="flex items-center gap-2">
+            <TestTube className="w-4 h-4 text-primary" />
+            <h3 className="font-medium">Test Models</h3>
+          </div>
+          <p className="text-[13px] text-muted-foreground">
+            Test your API keys and Ollama models to verify they're working
+          </p>
+          <ModelTestList />
+        </div>
+
+        {/* Model Selection */}
+        <div className="space-y-3">
+          <div className="flex items-center gap-2">
+            <Sparkles className="w-4 h-4 text-primary" />
+            <h3 className="font-medium">AI Model</h3>
+          </div>
+          <p className="text-[13px] text-muted-foreground">
+            Choose your preferred language model (only tested models are available)
+          </p>
+          <ModelSelector />
         </div>
       </div>
     </div>

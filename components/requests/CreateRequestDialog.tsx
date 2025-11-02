@@ -13,7 +13,7 @@ import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { generateRequestId } from '@/lib/utils/request-id'
-import { getRequestIdStorage } from '@/lib/storage/request-id-storage'
+import { createRequest } from '@/lib/api/requests-api'
 
 interface CreateRequestDialogProps {
   open: boolean
@@ -37,8 +37,8 @@ export function CreateRequestDialog({
 
     try {
       const newRequest = generateRequestId(userQuery || undefined)
-      const storage = getRequestIdStorage()
-      await storage.save(newRequest)
+      // Save via API
+      await createRequest(newRequest)
 
       // Reset form
       setUserQuery('')

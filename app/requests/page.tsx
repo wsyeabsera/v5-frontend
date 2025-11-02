@@ -7,34 +7,35 @@ import { RequestFilters, RequestFiltersState } from '@/components/requests/Reque
 import { RequestDetailModal } from '@/components/requests/RequestDetailModal'
 import { CreateRequestDialog } from '@/components/requests/CreateRequestDialog'
 import { Button } from '@/components/ui/button'
-import { getRequestIdStorage } from '@/lib/storage/request-id-storage'
-import { Plus, RefreshCw } from 'lucide-react'
+import { getAllRequests, deleteRequest, deleteAllRequests } from '@/lib/api/requests-api'
+import { Plus, RefreshCw, X, Trash2 } from 'lucide-react'
+import { DeleteAllDialog } from '@/components/ui/delete-all-dialog'
 
 export default function RequestsPage() {
   const [requests, setRequests] = useState<RequestContext[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [selectedRequest, setSelectedRequest] = useState<RequestContext | null>(null)
   const [isDetailOpen, setIsDetailOpen] = useState(false)
   const [isCreateOpen, setIsCreateOpen] = useState(false)
+  const [isDeleteAllOpen, setIsDeleteAllOpen] = useState(false)
   const [filters, setFilters] = useState<RequestFiltersState>({
     search: '',
     status: 'all',
-    agentName: '',
+    agentName: 'all',
   })
-
-  const storage = getRequestIdStorage()
 
   const loadRequests = async () => {
     setIsLoading(true)
+    setError(null)
     try {
-      const allRequests = await storage.getAll()
-      // Sort by createdAt descending (newest first)
-      const sorted = allRequests.sort(
-        (a, b) => b.createdAt.getTime() - a.createdAt.getTime()
-      )
-      setRequests(sorted)
-    } catch (error) {
+      // Fetch from API - requests are already sorted by createdAt descending
+      const allRequests = await getAllRequests()
+      setRequests(allRequests)
+    } catch (error: any) {
       console.error('Failed to load requests:', error)
+      const errorMessage = error?.message || 'Failed to load requests. Please check your connection and try again.'
+      setError(errorMessage)
     } finally {
       setIsLoading(false)
     }
@@ -74,9 +75,9 @@ export default function RequestsPage() {
     }
 
     // Agent name filter
-    if (filters.agentName) {
+    if (filters.agentName && filters.agentName !== 'all') {
       filtered = filtered.filter((req) =>
-        req.agentChain.includes(filters.agentName)
+        req.agentChain.includes(filters.agentName as string)
       )
     }
 
@@ -90,7 +91,7 @@ export default function RequestsPage() {
 
   const handleDelete = async (requestId: string) => {
     try {
-      await storage.delete(requestId)
+      await deleteRequest(requestId)
       await loadRequests()
       if (selectedRequest?.requestId === requestId) {
         setIsDetailOpen(false)
@@ -99,6 +100,19 @@ export default function RequestsPage() {
     } catch (error) {
       console.error('Failed to delete request:', error)
       throw error
+    }
+  }
+
+  const handleDeleteAll = async () => {
+    try {
+      const result = await deleteAllRequests()
+      setError(null)
+      await loadRequests()
+      // Show success message
+      alert(`Successfully deleted ${result.count} request${result.count !== 1 ? 's' : ''}`)
+    } catch (error: any) {
+      console.error('Failed to delete all requests:', error)
+      setError(error?.message || 'Failed to delete all requests')
     }
   }
 
@@ -126,6 +140,18 @@ export default function RequestsPage() {
               />
               Refresh
             </Button>
+            {requests.length > 0 && (
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={() => setIsDeleteAllOpen(true)}
+                disabled={isLoading}
+                className="gap-2"
+              >
+                <Trash2 className="w-4 h-4" />
+                Delete All
+              </Button>
+            )}
             <Button
               onClick={() => setIsCreateOpen(true)}
               className="gap-2"
@@ -135,6 +161,23 @@ export default function RequestsPage() {
             </Button>
           </div>
         </div>
+
+        {/* Error Display */}
+        {error && (
+          <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4">
+            <div className="flex items-center justify-between">
+              <p className="text-sm text-destructive">{error}</p>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setError(null)}
+                className="h-auto p-1"
+              >
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
+          </div>
+        )}
 
         {/* Filters */}
         <RequestFilters
@@ -178,6 +221,17 @@ export default function RequestsPage() {
           open={isCreateOpen}
           onOpenChange={setIsCreateOpen}
           onSuccess={loadRequests}
+        />
+
+        {/* Delete All Dialog */}
+        <DeleteAllDialog
+          open={isDeleteAllOpen}
+          onOpenChange={setIsDeleteAllOpen}
+          onConfirm={handleDeleteAll}
+          title="Delete All Requests"
+          description="Are you sure you want to delete all requests? This action cannot be undone."
+          itemCount={requests.length}
+          itemName="requests"
         />
       </div>
     </div>
