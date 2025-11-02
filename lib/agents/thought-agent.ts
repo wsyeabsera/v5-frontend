@@ -333,8 +333,8 @@ When recommending tools:
     // Step 6: Parse the structured response
     const thought = this.parseThoughtResponse(response, userQuery, 1)
 
-    // Step 7: Extract recommended tools
-    const recommendedTools = this.extractToolSuggestions(response)
+    // Step 7: Extract recommended tools (match against actual MCP resources)
+    const recommendedTools = this.extractToolSuggestions(response, contextToUse)
 
     // Step 8: Build output with Request ID
     const output: ThoughtAgentOutput = {
@@ -435,7 +435,7 @@ Challenge your assumptions. Explore edge cases.`
       thoughts: [thought],
       primaryApproach: thought.approaches[0] || 'Unknown',
       keyInsights: this.extractKeyInsights(thought.reasoning),
-      recommendedTools: this.extractToolSuggestions(response),
+      recommendedTools: this.extractToolSuggestions(response, mcpContext),
       reasoningPass: passNumber,
       totalPasses,
     }
@@ -522,29 +522,37 @@ Challenge your assumptions. Explore edge cases.`
    * @param response - LLM response
    * @returns Array of recommended tool names
    */
-  private extractToolSuggestions(response: string): string[] {
+  private extractToolSuggestions(response: string, mcpContext: MCPContext): string[] {
     const toolsSection = this.extractSection(response, 'TOOLS')
     if (!toolsSection) return []
 
-    // Extract tool names with context
-    // Match patterns like:
-    // - "tool_name(args)" 
-    // - "tool_name" followed by description
-    // - Numbered/bulleted tool lists
+    const recommendations = new Set<string>()
     
-    const toolPattern = /([a-z_]+(?:_[a-z]+)*)\s*(?:\([^)]*\))?/gi
-    const matches = Array.from(toolsSection.matchAll(toolPattern))
+    // Build lookup maps (case-insensitive) from actual MCP server data
+    const toolMap = new Map(mcpContext.tools.map(t => [t.name.toLowerCase(), t.name]))
+    const promptMap = new Map(mcpContext.prompts.map(p => [p.name.toLowerCase(), p.name]))
+    const resourceMap = new Map(
+      mcpContext.resources
+        .map(r => [r.name?.toLowerCase(), r.name])
+        .filter(([k, v]) => k && v) as Array<[string, string]>
+    )
     
-    const tools = new Set<string>()
-    for (const match of matches) {
-      const toolName = match[1].toLowerCase()
-      // Filter out common words
-      if (toolName.length > 3 && !['this', 'that', 'with', 'from', 'tool', 'function'].includes(toolName)) {
-        tools.add(toolName)
+    // Extract all potential identifiers from the TOOLS section
+    // Match: words with underscores, hyphens, or alphanumeric sequences
+    const words = toolsSection.toLowerCase().match(/\b[a-z][a-z0-9_-]*[a-z0-9]\b/g) || []
+    
+    for (const word of words) {
+      // Check against all MCP resources (tools, prompts, resources)
+      if (toolMap.has(word)) {
+        recommendations.add(toolMap.get(word)!)
+      } else if (promptMap.has(word)) {
+        recommendations.add(promptMap.get(word)!)
+      } else if (resourceMap.has(word)) {
+        recommendations.add(resourceMap.get(word)!)
       }
     }
     
-    return Array.from(tools)
+    return Array.from(recommendations)
   }
 
   /**
