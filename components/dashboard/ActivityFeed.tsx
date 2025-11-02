@@ -33,7 +33,16 @@ export function ActivityFeed() {
     )
   }
 
-  const allActivities = []
+  const allActivities: Array<{
+    id: string
+    type: string
+    accepted?: boolean
+    item?: string
+    facility: string
+    material?: string
+    level?: string
+    time: string
+  }> = []
 
   if (activity.recentInspections) {
     activity.recentInspections.slice(0, 5).forEach((inspection: any) => {

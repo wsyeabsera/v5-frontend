@@ -119,3 +119,26 @@ export interface StatsData {
   };
 }
 
+/**
+ * Request ID system types
+ */
+export interface RequestContext {
+  requestId: string;
+  createdAt: Date;
+  agentChain: string[];
+  status: 'pending' | 'in-progress' | 'completed' | 'failed';
+  userQuery?: string;
+}
+
+/**
+ * Base interface for all agent outputs that includes Request ID
+ * 
+ * Every agent's output should extend this to include the request context
+ */
+export interface AgentOutput {
+  requestId: string; // Links this output to the request chain
+  agentName: string; // Which agent produced this output
+  timestamp: Date; // When this agent ran
+  requestContext: RequestContext; // Full context for chaining
+}
+

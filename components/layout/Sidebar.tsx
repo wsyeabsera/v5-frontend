@@ -1,6 +1,6 @@
 'use client'
 
-import { Home, MessageSquare, Settings, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Home, MessageSquare, Settings, ChevronLeft, ChevronRight, List } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useState } from 'react'
@@ -10,6 +10,7 @@ import { ThemeToggle } from '@/components/theme-toggle'
 const navigation = [
   { name: 'Dashboard', href: '/', icon: Home },
   { name: 'Chat', href: '/chat', icon: MessageSquare },
+  { name: 'Requests', href: '/requests', icon: List },
   { name: 'Settings', href: '/settings', icon: Settings },
 ]
 
