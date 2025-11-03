@@ -421,7 +421,7 @@ export interface Critique {
   followUpQuestions: FollowUpQuestion[];
   strengths: string[];
   suggestions: string[];
-  recommendation: 'approve' | 'revise' | 'reject';
+  recommendation: 'approve' | 'revise' | 'reject' | 'approve-with-dynamic-fix';
   rationale: string;
 }
 
@@ -466,5 +466,80 @@ export interface MCPContext {
       required: boolean
     }>
   }>
+}
+
+/**
+ * Execution Result for a single step
+ */
+export interface ExecutionResult {
+  stepId: string;
+  stepOrder: number;
+  success: boolean;
+  result?: any;
+  error?: string;
+  errorType?: 'tool-error' | 'validation-error' | 'coordination-error' | 'missing-data';
+  duration: number;
+  retries: number;
+  timestamp: Date;
+  toolCalled?: string;
+  parametersUsed?: Record<string, any>;
+}
+
+/**
+ * Execution Follow-Up Question (context-rich)
+ */
+export interface ExecutionFollowUpQuestion {
+  id: string;
+  question: string;
+  category: 'missing-data' | 'error-recovery' | 'coordination' | 'ambiguity' | 'user-choice';
+  priority: 'low' | 'medium' | 'high';
+  context: {
+    stepId: string;
+    stepOrder: number;
+    whatFailed: string;
+    whatWasTried: string;
+    currentState: string;
+    suggestion: string;
+  };
+  userAnswer?: string;
+}
+
+/**
+ * Plan Execution Result
+ */
+export interface PlanExecutionResult {
+  planId: string;
+  overallSuccess: boolean;
+  steps: ExecutionResult[];
+  partialResults: Record<string, any>; // stepId -> result
+  errors: string[];
+  totalDuration: number;
+  questionsAsked: ExecutionFollowUpQuestion[];
+  adaptations: Array<{
+    stepId: string;
+    originalAction: string;
+    adaptedAction: string;
+    reason: string;
+  }>;
+  planUpdates?: Array<{
+    stepId: string;
+    stepOrder: number;
+    timestamp: Date;
+    originalParameters: Record<string, any>;
+    updatedParameters: Record<string, any>;
+    reason: string;
+  }>;
+}
+
+/**
+ * Executor Agent Output
+ */
+export interface ExecutorAgentOutput extends AgentOutput {
+  executionResult: PlanExecutionResult;
+  planId: string;
+  executionVersion?: number;
+  requiresUserFeedback: boolean;
+  critiqueAvailable?: boolean; // Whether critique was consulted
+  critiqueRecommendation?: 'approve' | 'revise' | 'reject' | 'approve-with-dynamic-fix';
 }
 

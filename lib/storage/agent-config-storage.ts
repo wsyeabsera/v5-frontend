@@ -64,6 +64,18 @@ const DEFAULT_AGENT_CONFIGS: AgentConfig[] = [
     enabled: true,
   },
   {
+    agentId: 'executor-agent',
+    name: 'Executor Agent',
+    description: 'Execute plans step-by-step with LLM-powered error handling and tool coordination',
+    modelId: 'gpt-3.5-turbo',
+    parameters: {
+      temperature: 0.3,
+      maxTokens: 2000,
+      topP: 0.9,
+    },
+    enabled: true,
+  },
+  {
     agentId: 'base-agent',
     name: 'Base Agent',
     description: 'Shared utilities for LLM calls and response parsing',

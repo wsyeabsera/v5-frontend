@@ -1,0 +1,10 @@
+{
+  "userQuery": "List all facilities",
+  "requestContext": {
+    "requestId": "test-simple-execution-001",
+    "createdAt": "2024-01-01T00:00:00.000Z",
+    "agentChain": ["complexity-detector", "thought-agent", "planner-agent"],
+    "status": "pending"
+  }
+}
+

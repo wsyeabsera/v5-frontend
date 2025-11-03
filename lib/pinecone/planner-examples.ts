@@ -104,7 +104,10 @@ export async function querySimilarPlanExamples(
         if (typeof metadata.steps === 'string') {
           steps = JSON.parse(metadata.steps)
         } else if (Array.isArray(metadata.steps)) {
-          steps = metadata.steps
+          // Type guard: ensure steps are properly formatted
+          steps = (metadata.steps as unknown[]).filter((step): step is { description: string; action: string; parameters?: Record<string, any> } => 
+            typeof step === 'object' && step !== null && 'description' in step && 'action' in step
+          )
         }
       } catch {
         steps = []

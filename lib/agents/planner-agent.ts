@@ -41,15 +41,83 @@ Your planning should be:
 - Parameter-extracting: Extract values from user query and thoughts (e.g., "facility ABC" → shortCode="ABC")
 
 CRITICAL FORMAT REQUIREMENTS:
-1. Parameter Names: MUST use EXACT parameter names from tool schemas (e.g., use "facilityId", not "id" or "facility_id")
-2. Parameter Extraction: Extract values from user query:
-   - "facility ABC" → shortCode: "ABC"
-   - "facility ID 123" → facilityId: "123" or id: "123" (check schema)
-   - "location Amsterdam" → location: "Amsterdam"
-3. JSON Format: Parameters must be valid JSON objects with exact parameter names
-4. Tool Names: Use exact tool names as shown in available tools list
+1. Tool Names: MUST use EXACT tool names from the "Available MCP Tools" list below. 
+   - ✅ CORRECT: "list_facilities", "get_facility", "generate_intelligent_facility_report"
+   - ❌ WRONG: "multi_tool_use.parallel", "functions.analyze_contract_producers", "tool.xyz"
+   - If a tool is not in the available tools list, DO NOT use it
+2. Parameter Names: MUST use EXACT parameter names from tool schemas (e.g., use "facilityId", not "id" or "facility_id")
+3. Parameter Extraction: Extract values from user query, BUT distinguish carefully:
+   - **shortCode values**: Short, uppercase codes (typically 2-4 chars, e.g., "HAN", "ABC", "CWP", "NYC") → use shortCode parameter
+     * ONLY use shortCode when the value looks like a code (short, uppercase/alphanumeric, no spaces)
+   - **name values**: Full facility names (longer, mixed case, may contain spaces, e.g., "Hannover", "Central Waste Processing Hub", "Boston Facility") → DO NOT use ANY filter for list_facilities
+     * Task 2.1: When user mentions facility by NAME (not shortCode, not location):
+       → For list_facilities: Use NO filters (empty parameters {}) - let the coordinator find the match by name in the results
+       → DO NOT use shortCode filter for facility names (names are NOT shortCodes)
+       → DO NOT use location filter for facility names (names are NOT locations)
+       → This allows the coordinator to extract the correct ID from the full list by matching the name
+   - **location values**: Geographic locations (e.g., "New York", "Amsterdam", "Los Angeles", "Boston") → use location parameter
+     * Task 2.1: Use location filter ONLY when user explicitly mentions a geographic location
+     * Phrases like "in [city]", "at [city]", "facilities in [city]" indicate location
+     * Common city names: New York, Boston, Chicago, Los Angeles, Amsterdam, Berlin, etc.
+   - **CRITICAL DISTINCTION - Task 2.1 Enhancement**:
+     * "Hannover", "Boston", "Berlin" can be EITHER facility names OR cities
+     * → If user says "facility Hannover" (singular, specific facility) → it's a NAME → use NO filters
+     * → If user says "facilities in Hannover" or "facilities at Hannover" → it's a LOCATION → use location: "Hannover"
+     * → If user says "Hannover facility" → it's a NAME → use NO filters
+     * → If user says "facility code HAN" → it's a shortCode → use shortCode: "HAN"
+     * → When uncertain whether it's a name or location:
+       * Default to treating it as a NAME (use no filters) if singular "facility X"
+       * Default to treating it as a LOCATION if plural "facilities in X" or "facilities at X"
+   - Examples:
+     * "facility ABC" → shortCode: "ABC" (if ABC is short, looks like code)
+     * "facility Hannover" → list_facilities with NO filters ({}), coordinator matches by name
+     * "facilities in New York" → location: "New York" (geographic location)
+     * "facilities in Boston" → location: "Boston" (geographic location)
+     * "facility Boston" (singular) → list_facilities with NO filters ({}), coordinator matches by name
+     * "facility code HAN" → shortCode: "HAN"
+     * "facility ID 123" → facilityId: "123" or id: "123" (check schema)
+4. JSON Format: Parameters must be valid JSON objects with exact parameter names
 5. Dependencies: Reference step numbers (e.g., "1, 2" or [])
-6. Required Parameters: All required parameters from tool schema MUST be included
+6. Optional Filter Parameters - CRITICAL: DO NOT SET TO NULL:
+   - **Optional filter parameters** (like shortCode, location) must be **OMITTED entirely** if not needed
+   - **DO NOT set filter parameters to null** - omit them from the parameters object instead
+   - MCP tools reject null values with validation errors
+   - Examples:
+     * "List all facilities" → parameters: {} (empty object, no filters)
+     * "List facilities in Berlin" → parameters: { location: "Berlin" }
+     * "List facility HAN" → parameters: { shortCode: "HAN" }
+     * WRONG: { shortCode: null } → will cause validation error
+7. Required Parameters: Task 2.2 - Handle missing required parameters correctly:
+   - **DO NOT fill parameters with generic placeholder text** like "Detected Waste Item", "Contaminant Material", "Shipment123", etc.
+   - **DO NOT use default/example values** like "Test Facility", "Example Value", "Default Material"
+   - **Instead, use structured placeholders**:
+     * If parameter can be extracted from previous step: use "EXTRACT_FROM_STEP_X" where X is the step number
+     * If parameter requires user input: use "REQUIRED" or leave as null
+     * If parameter value is truly unknown: use null
+   - **Only fill parameters when you can extract the actual value** from the user query or thoughts
+   - Examples:
+     * WRONG: {"material": "Contaminant Material", "wasteItemDetected": "Detected Waste Item"}
+     * CORRECT: {"material": null, "wasteItemDetected": "REQUIRED"}
+     * CORRECT: {"facilityId": "EXTRACT_FROM_STEP_1"} (if step 1 can provide it)
+     * CORRECT: {"material": "Plastic"} (if user query mentions "plastic")
+
+TOOL USAGE CONSTRAINT - CRITICAL:
+- ONLY use tools that appear in the "Available MCP Tools" section below
+- DO NOT invent tool names or use patterns like "multi_tool_use.*" or "functions.*"
+- DO NOT use abstract tool names like "analyze", "calculate", "count" - these don't exist
+- DO NOT create compound tools like "multi_tool_use.parallel" or "functions.analyze_contract_producers"
+- Valid tool examples: "list_facilities", "get_facility", "list_shipments", "generate_intelligent_facility_report"
+- Invalid tool examples: "multi_tool_use.parallel", "functions.analyze_contract_producers", "analyze_shipments"
+- If you need to analyze data, use the actual analysis tools from the list:
+  * "generate_intelligent_facility_report" for facility analysis
+  * "analyze_shipment_risk" for shipment analysis
+  * "suggest_inspection_questions" for inspection questions
+- If a required operation doesn't have a direct tool, structure the plan to:
+  1. Use existing tools in sequence (e.g., list_tools → process results manually)
+  2. Use available analysis tools if they match the need
+  3. Simplify the plan to use only available tools
+
+Before finalizing your plan, verify EVERY tool name in your steps exists in the "Available MCP Tools" list below.
 
 You MUST respond with ONLY a valid JSON object in this exact format:
 
@@ -205,7 +273,17 @@ Remember: You are outputting JSON only, no text before or after the JSON object.
       const categorized = this.categorizeTools(mcpContext.tools)
       
       prompt += '## Available MCP Tools\n\n'
-      prompt += '⚠️ CRITICAL: Use EXACT tool names and parameter names shown below. Do NOT invent parameter names.\n\n'
+      prompt += '🚨 CRITICAL - READ THIS CAREFULLY:\n'
+      prompt += '1. ONLY use tool names that appear EXACTLY as shown in this list below\n'
+      prompt += '2. DO NOT use tool names starting with "multi_tool_use", "functions", or any pattern\n'
+      prompt += '3. DO NOT invent new tool names - if a tool is not listed here, it does NOT exist\n'
+      prompt += '4. DO NOT create compound tools or abstract names like "analyze", "calculate", "count"\n'
+      prompt += '5. DO NOT use "review-shipment-inspection" in the action field - that is a PROMPT, not a tool\n'
+      prompt += '6. Valid tools have names like: "list_facilities", "get_facility", "list_shipments", "generate_intelligent_facility_report"\n'
+      prompt += '7. Invalid tools (DO NOT USE): "multi_tool_use.*", "functions.*", "analyze_*", "review-*"\n'
+      prompt += '8. Use EXACT tool names and parameter names as shown below\n'
+      prompt += '9. If you need functionality not covered by a single tool, create a multi-step plan using EXISTING tools ONLY\n'
+      prompt += '\n⚠️ VALIDATION: Before responding, verify EVERY tool name in your plan exists in the list below.\n\n'
       
       for (const [category, tools] of Object.entries(categorized)) {
         if (tools.length > 0) {
@@ -449,8 +527,11 @@ Remember: You are outputting JSON only, no text before or after the JSON object.
     // Step 6: Parse the structured response
     const plan = this.parsePlanResponse(response, userQuery, thoughts)
 
+    // Step 6.5: Normalize invalid tool names (e.g., functions.get_facility -> get_facility)
+    const normalizedPlan = this.normalizeToolNames(plan, contextToUse)
+
     // Step 7: Validate plan against MCP tool schemas
-    const validationResults = this.validatePlan(plan, contextToUse)
+    const validationResults = this.validatePlan(normalizedPlan, contextToUse)
     if (validationResults.warnings.length > 0 || validationResults.errors.length > 0) {
       logger.warn(`[PlannerAgent] Plan validation issues`, {
         requestId: updatedContext.requestId,
@@ -474,16 +555,16 @@ Remember: You are outputting JSON only, no text before or after the JSON object.
       requestContext: updatedContext,
 
       // Planner-specific output
-      plan,
+      plan: normalizedPlan,
       rationale,
       basedOnThoughts: thoughts.map(t => t.id),
     }
 
     logger.info(`[PlannerAgent] Generated plan`, {
       requestId: output.requestId,
-      stepsCount: plan.steps.length,
-      confidence: plan.confidence.toFixed(2),
-      complexity: plan.estimatedComplexity.toFixed(2),
+      stepsCount: normalizedPlan.steps.length,
+      confidence: normalizedPlan.confidence.toFixed(2),
+      complexity: normalizedPlan.estimatedComplexity.toFixed(2),
     })
 
     return output
@@ -1005,6 +1086,63 @@ Refine this plan. Fix issues. Incorporate new requirements. Maintain the structu
     }
     
     return { warnings, errors }
+  }
+
+  /**
+   * Normalize invalid tool names (e.g., functions.get_facility -> get_facility)
+   * 
+   * Fixes common patterns where LLM adds prefixes/suffixes to tool names
+   * 
+   * @param plan - Plan with potentially invalid tool names
+   * @param mcpContext - MCP context with available tools
+   * @returns Plan with normalized tool names
+   */
+  private normalizeToolNames(plan: Plan, mcpContext: MCPContext): Plan {
+    // Build lookup map of available tools
+    const toolMap = new Map(mcpContext.tools.map(t => [t.name.toLowerCase(), t.name]))
+    
+    // Normalize each step's action
+    const normalizedSteps = plan.steps.map(step => {
+      const originalAction = step.action
+      let normalizedAction = originalAction
+      
+      // Skip if already a valid tool name
+      if (toolMap.has(originalAction.toLowerCase())) {
+        return step
+      }
+      
+      // Try to fix common patterns
+      // Pattern 1: functions.get_facility -> get_facility
+      if (originalAction.startsWith('functions.')) {
+        normalizedAction = originalAction.substring('functions.'.length)
+        if (toolMap.has(normalizedAction.toLowerCase())) {
+          logger.info(`[PlannerAgent] Normalized tool name: ${originalAction} -> ${normalizedAction}`)
+          return { ...step, action: toolMap.get(normalizedAction.toLowerCase())! }
+        }
+      }
+      
+      // Pattern 2: multi_tool_use.parallel - this doesn't exist, can't normalize
+      if (originalAction.startsWith('multi_tool_use.')) {
+        logger.warn(`[PlannerAgent] Invalid tool pattern: ${originalAction} cannot be normalized`)
+        return step // Leave as is, will be caught by validation
+      }
+      
+      // Pattern 3: tool.get_facility -> get_facility
+      if (originalAction.startsWith('tool.')) {
+        normalizedAction = originalAction.substring('tool.'.length)
+        if (toolMap.has(normalizedAction.toLowerCase())) {
+          logger.info(`[PlannerAgent] Normalized tool name: ${originalAction} -> ${normalizedAction}`)
+          return { ...step, action: toolMap.get(normalizedAction.toLowerCase())! }
+        }
+      }
+      
+      return step
+    })
+    
+    return {
+      ...plan,
+      steps: normalizedSteps,
+    }
   }
 
   /**

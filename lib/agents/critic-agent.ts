@@ -75,7 +75,7 @@ You MUST respond with ONLY a valid JSON object in this exact format:
     }
   ],
   "suggestions": ["improvement 1", "improvement 2"],
-  "recommendation": "approve|revise|reject",
+  "recommendation": "approve|revise|reject|approve-with-dynamic-fix",
   "rationale": "Why this recommendation"
 }
 
@@ -307,6 +307,52 @@ Remember: You are outputting JSON only, no text before or after the JSON object.
     // Step 7: Parse the structured response
     const critique = this.parseCritiqueResponse(response, plan.id, userFeedback)
 
+    // Step 7.5: Check if plan can be fixed dynamically and update recommendation if needed
+    if (validation.missingParams.length > 0) {
+      const canBeFixed = this.canBeFixedDynamically(plan, validation.missingParams, mcpContext)
+      if (canBeFixed && (critique.recommendation === 'reject' || critique.recommendation === 'revise')) {
+        // Update recommendation to approve-with-dynamic-fix
+        critique.recommendation = 'approve-with-dynamic-fix'
+        critique.rationale = `Plan can be dynamically fixed during execution. Missing parameters will be obtained from earlier step results: ${critique.rationale}`
+        logger.info(`[CriticAgent] Plan can be fixed dynamically`, {
+          requestId: updatedContext.requestId,
+          missingParams: validation.missingParams.length
+        })
+      }
+    }
+
+    // Task 3.4: Sync validation warnings with follow-up questions
+    // Ensure warnings align with questions - if a parameter is in warnings, it should have a question (or be dynamic-fixable)
+    const syncedValidationWarnings = validation.missingParams.map(warning => {
+      // Check if there's a corresponding question for this parameter
+      const hasQuestion = critique.followUpQuestions.some(q => {
+        // Question might reference the parameter name, step number, or tool
+        const questionLower = q.question.toLowerCase()
+        return questionLower.includes(warning.missingParam.toLowerCase()) ||
+               questionLower.includes(`step ${warning.stepOrder}`) ||
+               questionLower.includes(warning.tool.toLowerCase())
+      })
+      
+      return {
+        ...warning,
+        hasCorrespondingQuestion: hasQuestion,
+      }
+    })
+    
+    // Log mismatches for debugging
+    const warningsWithoutQuestions = syncedValidationWarnings.filter(w => !w.hasCorrespondingQuestion)
+    if (warningsWithoutQuestions.length > 0 && critique.recommendation !== 'approve-with-dynamic-fix') {
+      logger.warn(`[CriticAgent] Validation warnings without corresponding questions`, {
+        requestId: updatedContext.requestId,
+        warningsWithoutQuestions: warningsWithoutQuestions.map(w => ({
+          step: w.stepOrder,
+          tool: w.tool,
+          param: w.missingParam,
+        })),
+        recommendation: critique.recommendation,
+      })
+    }
+
     // Step 8: Build output with Request ID
     const output: CriticAgentOutput = {
       // Agent output base
@@ -319,7 +365,14 @@ Remember: You are outputting JSON only, no text before or after the JSON object.
       critique,
       planId: plan.id,
       requiresUserFeedback: critique.followUpQuestions.some(q => !q.userAnswer),
-      validationWarnings: validation.missingParams,
+      // Task 3.4: Use synced validation warnings (excluding dynamic-fixable ones that have questions)
+      validationWarnings: syncedValidationWarnings.filter(w => {
+        // Include warnings that either:
+        // 1. Have corresponding questions, OR
+        // 2. Don't have questions but aren't dynamic-fixable (true missing)
+        // This ensures warnings align with questions
+        return w.hasCorrespondingQuestion || (!w.hasCorrespondingQuestion && critique.recommendation !== 'approve-with-dynamic-fix')
+      }).map(({ hasCorrespondingQuestion, ...rest }) => rest), // Remove helper field
     }
 
     logger.info(`[CriticAgent] Plan critiqued`, {
@@ -348,7 +401,7 @@ Remember: You are outputting JSON only, no text before or after the JSON object.
     userQuery: string,
     mcpContext: MCPContext,
     userFeedback?: { questionId: string; answer: string }[],
-    validation?: { missingParams: Array<{ stepId: string; stepOrder: number; tool: string; missingParam: string; isRequired: boolean }> },
+    validation?: { missingParams: Array<{ stepId: string; stepOrder: number; tool: string; missingParam: string; isRequired: boolean; isGenericPlaceholder?: boolean }> },
     toolValidation?: Array<{ stepOrder: number; stepId: string; tool: string; available: boolean }>
   ): string {
     let prompt = `User Query: "${userQuery}"\n\n`
@@ -356,11 +409,36 @@ Remember: You are outputting JSON only, no text before or after the JSON object.
     // Add validation results if available
     if (validation && validation.missingParams.length > 0) {
       prompt += `⚠️ MISSING REQUIRED PARAMETERS:\n`
-      for (const missing of validation.missingParams) {
-        prompt += `- Step ${missing.stepOrder} (${missing.stepId}): Tool '${missing.tool}' requires '${missing.missingParam}'\n`
+      
+      // Task 3.1: Separate generic placeholders from truly missing
+      const genericPlaceholders = validation.missingParams.filter(m => m.isGenericPlaceholder)
+      const trulyMissing = validation.missingParams.filter(m => !m.isGenericPlaceholder)
+      
+      if (genericPlaceholders.length > 0) {
+        prompt += `\n📌 GENERIC PLACEHOLDER VALUES DETECTED (Task 3.1):\n`
+        prompt += `These parameters contain generic placeholder text instead of real values:\n`
+        for (const missing of genericPlaceholders) {
+          const actualValue = plan.steps.find(s => s.id === missing.stepId)?.parameters?.[missing.missingParam]
+          prompt += `- Step ${missing.stepOrder} (${missing.stepId}): Tool '${missing.tool}' parameter '${missing.missingParam}'\n`
+          prompt += `  Current value: "${actualValue}" (generic placeholder - needs real value)\n`
+        }
+        prompt += `\n`
       }
-      prompt += `\nGenerate follow-up questions to collect these missing parameter values.\n`
-      prompt += `Ask SPECIFIC questions referencing the step number and parameter name.\n\n`
+      
+      if (trulyMissing.length > 0) {
+        prompt += `\n📌 TRULY MISSING PARAMETERS:\n`
+        for (const missing of trulyMissing) {
+          prompt += `- Step ${missing.stepOrder} (${missing.stepId}): Tool '${missing.tool}' requires '${missing.missingParam}' (not provided)\n`
+        }
+        prompt += `\n`
+      }
+      
+      prompt += `\nTask 3.2: Generate follow-up questions to collect ALL missing parameter values.\n`
+      prompt += `- For generic placeholders: Ask what the ACTUAL value should be (not the placeholder)\n`
+      prompt += `- For truly missing: Ask what value to use\n`
+      prompt += `- Ask SPECIFIC questions referencing the step number and parameter name\n`
+      prompt += `- Map parameter names to user-friendly descriptions (e.g., "wasteItemDetected" → "What waste item was detected?")\n`
+      prompt += `- Ensure ALL ${validation.missingParams.length} missing parameters generate questions\n\n`
     }
 
     // Add tool availability validation results
@@ -413,11 +491,89 @@ Remember: You are outputting JSON only, no text before or after the JSON object.
   }
 
   /**
+   * Task 3.1: Detect if a value is a generic placeholder
+   * 
+   * @param value - Value to check
+   * @param paramName - Parameter name
+   * @param toolName - Tool name for context
+   * @returns true if value appears to be a generic placeholder
+   */
+  private isGenericPlaceholder(value: any, paramName: string, toolName: string): boolean {
+    if (typeof value !== 'string') return false
+    
+    const valueLower = value.toLowerCase()
+    
+    // Detect generic text patterns
+    const genericPatterns = [
+      /detected\s+waste\s+item/i,
+      /contaminant\s+material/i,
+      /waste\s+item\s+detected/i,
+      /material\s+type/i,
+      /shipment\d+/i,
+      /facility\d+/i,
+      /contract\d+/i,
+      /test\s+\w*/i,
+      /example\s+\w*/i,
+      /default\s+\w*/i,
+      /sample\s+\w*/i,
+      /placeholder\s+\w*/i,
+      /^test\s*$/i,
+      /^example\s*$/i,
+      /^default\s*$/i,
+    ]
+    
+    // Check generic patterns
+    if (genericPatterns.some(pattern => pattern.test(value))) {
+      return true
+    }
+    
+    // Detect old dates (more than 1 year old) - likely placeholder
+    if (this.isOldDate(value)) {
+      return true
+    }
+    
+    // Detect common placeholder numbers (default values like 0, 50, 100 when context suggests placeholder)
+    if (typeof value === 'string' && /^\d+$/.test(value)) {
+      const numValue = parseInt(value, 10)
+      // Common placeholder numbers
+      if ([0, 1, 10, 50, 100, 123].includes(numValue)) {
+        // Check if param name suggests this is likely a placeholder
+        const placeholderNumberParams = ['estimated_size', 'heating_value', 'size', 'amount', 'quantity']
+        if (placeholderNumberParams.some(p => paramName.toLowerCase().includes(p))) {
+          return true
+        }
+      }
+    }
+    
+    return false
+  }
+
+  /**
+   * Check if a string is an old date (more than 1 year old)
+   * 
+   * @param value - String to check
+   * @returns true if value is a date more than 1 year old
+   */
+  private isOldDate(value: string): boolean {
+    try {
+      const date = new Date(value)
+      if (isNaN(date.getTime())) return false
+      
+      const oneYearAgo = new Date()
+      oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1)
+      
+      return date < oneYearAgo
+    } catch {
+      return false
+    }
+  }
+
+  /**
    * Validate plan parameters against available tool schemas
    * 
    * @param plan - Plan to validate
    * @param mcpContext - MCP context with tool schemas
-   * @returns Missing parameter information
+   * @returns Missing parameter information including generic placeholders
    */
   private validatePlanParameters(plan: Plan, mcpContext: MCPContext): {
     missingParams: Array<{
@@ -426,6 +582,7 @@ Remember: You are outputting JSON only, no text before or after the JSON object.
       tool: string
       missingParam: string
       isRequired: boolean
+      isGenericPlaceholder?: boolean
     }>
   } {
     const missingParams: Array<{
@@ -434,6 +591,7 @@ Remember: You are outputting JSON only, no text before or after the JSON object.
       tool: string
       missingParam: string
       isRequired: boolean
+      isGenericPlaceholder?: boolean
     }> = []
     
     for (const step of plan.steps) {
@@ -450,22 +608,29 @@ Remember: You are outputting JSON only, no text before or after the JSON object.
       for (const param of required) {
         // Check if parameter is missing or has placeholder value
         const paramValue = step.parameters?.[param]
-        const isPlaceholder = typeof paramValue === 'string' && (
+        
+        // Task 3.1: Check for obvious placeholders
+        const isObviousPlaceholder = typeof paramValue === 'string' && (
           paramValue.toLowerCase().includes('example') ||
           paramValue.toLowerCase().includes('placeholder') ||
           paramValue.toLowerCase().includes('extracted_from') ||
           paramValue.toLowerCase().includes('extracted_') ||
+          paramValue.toLowerCase().includes('required') ||
           paramValue === '' ||
           paramValue.trim() === ''
         )
         
-        if (!paramValue || isPlaceholder) {
+        // Task 3.1: Check for generic placeholders (expanded detection)
+        const isGeneric = paramValue ? this.isGenericPlaceholder(paramValue, param, step.action) : false
+        
+        if (!paramValue || isObviousPlaceholder || isGeneric) {
           missingParams.push({
             stepId: step.id,
             stepOrder: step.order,
             tool: step.action,
             missingParam: param,
-            isRequired: true
+            isRequired: true,
+            isGenericPlaceholder: isGeneric || isObviousPlaceholder,
           })
         }
       }
@@ -577,10 +742,36 @@ Remember: You are outputting JSON only, no text before or after the JSON object.
         affectedSteps: issue.affectedSteps || undefined,
       }))
 
+      // Task 3.3: Fix score calculation - handle 0 values properly
+      const overallScoreRaw = parsed.overallScore
+      const clampedOverallScore = this.clampScore(overallScoreRaw)
+      
+      // Log score parsing for debugging
+      logger.debug(`[CriticAgent] Score parsing`, {
+        rawOverallScore: overallScoreRaw,
+        clampedOverallScore,
+        rawFeasibility: parsed.feasibilityScore,
+        rawCorrectness: parsed.correctnessScore,
+        rawEfficiency: parsed.efficiencyScore,
+        rawSafety: parsed.safetyScore,
+      })
+      
+      // If overall score is 0 or missing, check if other scores provide guidance
+      // This handles cases where LLM might return 0 for dynamic-fix scenarios
+      const finalOverallScore = (overallScoreRaw === 0 || overallScoreRaw === null || overallScoreRaw === undefined)
+        ? Math.max(
+            this.clampScore(parsed.feasibilityScore || 0),
+            this.clampScore(parsed.correctnessScore || 0),
+            this.clampScore(parsed.efficiencyScore || 0),
+            this.clampScore(parsed.safetyScore || 0),
+            0.3 // Minimum score to avoid 0
+          )
+        : clampedOverallScore
+
       const critique: Critique = {
         id: `critique-${Date.now()}`,
         planId,
-        overallScore: this.clampScore(parsed.overallScore),
+        overallScore: finalOverallScore,
         feasibilityScore: this.clampScore(parsed.feasibilityScore),
         correctnessScore: this.clampScore(parsed.correctnessScore),
         efficiencyScore: this.clampScore(parsed.efficiencyScore),
@@ -589,7 +780,7 @@ Remember: You are outputting JSON only, no text before or after the JSON object.
         followUpQuestions,
         strengths: parsed.strengths || [],
         suggestions: parsed.suggestions || [],
-        recommendation: this.determineRecommendation(parsed.overallScore || 0.5),
+        recommendation: this.determineRecommendation(finalOverallScore),
         rationale: parsed.rationale || 'No rationale provided',
       }
 
@@ -647,5 +838,88 @@ Remember: You are outputting JSON only, no text before or after the JSON object.
     } else {
       return 'reject'
     }
+  }
+
+  /**
+   * Check if a plan can be fixed dynamically during execution
+   * 
+   * A plan can be fixed dynamically if:
+   * - A step has missing required parameters
+   * - BUT an earlier step can provide those parameters (via list/search operations)
+   * 
+   * @param plan - Plan to check
+   * @param missingParams - List of missing parameters
+   * @param mcpContext - MCP context for tool information
+   * @returns true if plan can be fixed dynamically
+   */
+  private canBeFixedDynamically(
+    plan: Plan,
+    missingParams: Array<{ stepId: string; stepOrder: number; tool: string; missingParam: string; isRequired: boolean }>,
+    mcpContext: MCPContext
+  ): boolean {
+    // Group missing params by step
+    const missingByStep = new Map<number, Array<{ stepId: string; tool: string; missingParam: string }>>()
+    
+    for (const missing of missingParams) {
+      if (!missing.isRequired) continue // Only consider required params
+      
+      if (!missingByStep.has(missing.stepOrder)) {
+        missingByStep.set(missing.stepOrder, [])
+      }
+      missingByStep.get(missing.stepOrder)!.push({
+        stepId: missing.stepId,
+        tool: missing.tool,
+        missingParam: missing.missingParam
+      })
+    }
+
+    // For each step with missing params, check if earlier steps can provide them
+    for (const [stepOrder, missing] of Array.from(missingByStep.entries())) {
+      const currentStep = plan.steps.find(s => s.order === stepOrder)
+      if (!currentStep) continue
+
+      // Check earlier steps (steps with order < stepOrder)
+      const earlierSteps = plan.steps.filter(s => s.order < stepOrder)
+      
+      for (const missingParam of missing) {
+        // Check if any earlier step uses a tool that can provide this parameter
+        // Common patterns:
+        // - list_* tools that return arrays with IDs
+        // - search_* tools that return objects with IDs
+        // - get_* tools that return single objects
+        let canProvide = false
+        
+        for (const earlierStep of earlierSteps) {
+          const earlierAction = earlierStep.action.toLowerCase()
+          
+          // Check if earlier step action suggests it can provide IDs/data
+          if (
+            earlierAction.includes('list') ||
+            earlierAction.includes('search') ||
+            earlierAction.includes('get') ||
+            earlierAction.includes('find')
+          ) {
+            // Check if the missing param name suggests it's an ID that can be extracted
+            const paramLower = missingParam.missingParam.toLowerCase()
+            if (
+              paramLower.includes('id') ||
+              paramLower.includes('identifier') ||
+              paramLower.includes('key')
+            ) {
+              canProvide = true
+              break
+            }
+          }
+        }
+
+        if (!canProvide) {
+          // At least one required param cannot be provided by earlier steps
+          return false
+        }
+      }
+    }
+
+    // All missing required params can be provided by earlier steps
+    return missingByStep.size > 0
   }
 }

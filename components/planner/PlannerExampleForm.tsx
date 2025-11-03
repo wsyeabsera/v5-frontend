@@ -46,7 +46,9 @@ export function PlannerExampleForm({ example, onSubmit, onCancel, isLoading = fa
     if (steps.length > 1) {
       setSteps(steps.filter((_, i) => i !== index))
       // Remove error for deleted step
-      setParameterErrors({ ...parameterErrors, [index]: undefined })
+      const newErrors = { ...parameterErrors }
+      delete newErrors[index]
+      setParameterErrors(newErrors)
     }
   }
 
