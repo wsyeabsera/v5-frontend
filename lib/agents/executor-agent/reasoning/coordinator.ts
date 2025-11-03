@@ -421,9 +421,11 @@ Remember:
       if (typeof value === 'string') {
         // Detect placeholder patterns
         if (value.toLowerCase().includes('extracted') ||
+            value.toLowerCase().includes('extract') ||
             value.toLowerCase().includes('from_step') ||
+            value.toLowerCase().includes('from step') ||
             value.toLowerCase().includes('placeholder') ||
-            value.match(/extracted.*step/i)) {
+            value.match(/extract.*step/i)) {
           placeholderParams.add(key)
         }
       } else if (value === null || value === undefined || value === '') {
@@ -541,9 +543,11 @@ Remember:
       if (placeholderParams.has(key) && typeof value === 'string') {
         // Check if value is still a placeholder
         if (value.toLowerCase().includes('extracted') ||
+            value.toLowerCase().includes('extract') ||
             value.toLowerCase().includes('from_step') ||
+            value.toLowerCase().includes('from step') ||
             value.toLowerCase().includes('placeholder') ||
-            value.match(/extracted.*step/i)) {
+            value.match(/extract.*step/i)) {
           remainingPlaceholders.push(key)
         }
       }

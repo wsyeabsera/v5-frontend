@@ -543,3 +543,60 @@ export interface ExecutorAgentOutput extends AgentOutput {
   critiqueRecommendation?: 'approve' | 'revise' | 'reject' | 'approve-with-dynamic-fix';
 }
 
+/**
+ * Tool Recommendation - Individual tool recommendation with priority and rationale
+ */
+export interface ToolRecommendation {
+  toolName: string; // Name of the recommended tool
+  priority: number; // 0-1, how important this tool is for the query
+  rationale: string; // Why this tool is recommended
+  exampleUsage?: string; // Example from memory if available
+  toolChain?: string[]; // Related tools that work well together
+}
+
+/**
+ * Tool Chain - Sequence of tools that work well together
+ */
+export interface ToolChain {
+  sequence: string[]; // Ordered list of tool names
+  rationale: string; // Why this sequence is recommended
+  successRate?: number; // From memory if available (0-1)
+}
+
+/**
+ * Tool Memory Example stored in Pinecone
+ * 
+ * Stores tool usage patterns for semantic search and recommendation
+ */
+export interface ToolMemoryExample {
+  id: string; // Pinecone vector ID
+  query: string; // Example query that used these tools
+  embedding: number[]; // Vector embedding
+  tools: string[]; // Tools that were used
+  toolSequence: string[]; // Order of tool usage
+  complexityScore: number; // Complexity of the query
+  success: boolean; // Did it work well?
+  mcpPrompts?: string[]; // MCP prompts used
+  entryType: 'metadata' | 'usage-example'; // Type of entry
+  toolName?: string; // For metadata entries, the tool name
+  description?: string; // Tool/prompt description
+  parameters?: string; // Tool parameters as string
+  successRating: number; // 0-1, how good this example is
+  createdAt: string; // ISO timestamp
+  updatedAt: string; // ISO timestamp
+  usageCount: number; // Track how often this example is matched
+}
+
+/**
+ * Tool Memory Agent Output - Extends AgentOutput with tool recommendations
+ */
+export interface ToolMemoryOutput extends AgentOutput {
+  recommendedTools: ToolRecommendation[]; // Prioritized tool recommendations
+  toolChains: ToolChain[]; // Recommended tool sequences
+  memoryMatches: Array<{
+    query: string; // Similar past query
+    tools: string[]; // Tools that worked
+    similarity: number; // Similarity score (0-1)
+  }>; // Similar tool usage patterns from memory
+}
+

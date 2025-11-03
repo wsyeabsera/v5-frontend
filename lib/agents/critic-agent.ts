@@ -616,6 +616,7 @@ Remember: You are outputting JSON only, no text before or after the JSON object.
           paramValue.toLowerCase().includes('extracted_from') ||
           paramValue.toLowerCase().includes('extracted_') ||
           paramValue.toLowerCase().includes('required') ||
+          paramValue === 'REQUIRED' || paramValue === 'Required' || paramValue === 'required' ||
           paramValue === '' ||
           paramValue.trim() === ''
         )

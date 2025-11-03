@@ -76,6 +76,18 @@ const DEFAULT_AGENT_CONFIGS: AgentConfig[] = [
     enabled: true,
   },
   {
+    agentId: 'tool-memory-agent',
+    name: 'Tool Memory Agent',
+    description: 'Provides intelligent tool recommendations based on past successful usage patterns',
+    modelId: 'gpt-3.5-turbo',
+    parameters: {
+      temperature: 0.7,
+      maxTokens: 2000,
+      topP: 0.9,
+    },
+    enabled: true,
+  },
+  {
     agentId: 'base-agent',
     name: 'Base Agent',
     description: 'Shared utilities for LLM calls and response parsing',

@@ -14,11 +14,12 @@
  */
 
 import { BaseAgent } from './base-agent'
-import { Thought, ThoughtAgentOutput, RequestContext, MCPContext, ThoughtExample } from '@/types'
+import { Thought, ThoughtAgentOutput, RequestContext, MCPContext, ThoughtExample, ToolMemoryOutput, ComplexityScore } from '@/types'
 import { logger } from '@/utils/logger'
 import { listMCPPrompts, listMCPTools } from '@/lib/mcp-prompts'
 import { querySimilarThoughtExamples, incrementThoughtExampleUsage } from '@/lib/pinecone/thought-examples'
 import { generateEmbedding } from '@/lib/ollama/embeddings'
+import { ToolMemoryAgent } from './tool-memory-agent'
 
 /**
  * Thought Agent Class
@@ -136,15 +137,17 @@ When recommending tools:
   /**
    * Build enhanced system prompt with context
    * 
-   * Dynamically constructs system prompt with MCP context and similar examples.
+   * Dynamically constructs system prompt with MCP context, similar examples, and tool recommendations.
    * 
    * @param mcpContext - MCP tools/resources/prompts
    * @param similarExamples - Similar thought examples from Pinecone
+   * @param toolRecommendations - Optional tool memory recommendations
    * @returns Enhanced system prompt
    */
   private buildEnhancedSystemPrompt(
     mcpContext: MCPContext,
-    similarExamples: Array<{ example: ThoughtExample; similarity: number }>
+    similarExamples: Array<{ example: ThoughtExample; similarity: number }>,
+    toolRecommendations?: ToolMemoryOutput
   ): string {
     let prompt = this.baseSystemPrompt + '\n\n'
 
@@ -220,6 +223,44 @@ When recommending tools:
       }
     }
 
+    // Add tool memory recommendations if available
+    if (toolRecommendations && toolRecommendations.recommendedTools.length > 0) {
+      prompt += '## AI-Powered Tool Recommendations\n\n'
+      prompt += '🚨 IMPORTANT: These tools have been intelligently recommended based on similar successful patterns.\n\n'
+      prompt += 'Prioritize these tools in your TOOLS section:\n\n'
+      
+      // Sort by priority
+      const sortedTools = [...toolRecommendations.recommendedTools].sort(
+        (a, b) => b.priority - a.priority
+      )
+      
+      for (const rec of sortedTools) {
+        prompt += `- **${rec.toolName}** (Priority: ${(rec.priority * 100).toFixed(0)}%)\n`
+        prompt += `  Rationale: ${rec.rationale}\n`
+        if (rec.exampleUsage) {
+          prompt += `  Example: "${rec.exampleUsage}"\n`
+        }
+        if (rec.toolChain && rec.toolChain.length > 0) {
+          prompt += `  Works well with: ${rec.toolChain.join(', ')}\n`
+        }
+        prompt += '\n'
+      }
+
+      if (toolRecommendations.toolChains.length > 0) {
+        prompt += '### Recommended Tool Chains\n\n'
+        for (const chain of toolRecommendations.toolChains) {
+          prompt += `- ${chain.sequence.join(' → ')}\n`
+          prompt += `  Rationale: ${chain.rationale}\n`
+          if (chain.successRate !== undefined) {
+            prompt += `  Success Rate: ${(chain.successRate * 100).toFixed(0)}%\n`
+          }
+          prompt += '\n'
+        }
+      }
+
+      prompt += '\n'
+    }
+
     // Add domain knowledge
     prompt += '## Domain Knowledge\n\n'
     prompt += '- Waste management facility operations\n'
@@ -230,11 +271,21 @@ When recommending tools:
 
     prompt += '## Your Task\n\n'
     prompt += 'Given the context above, think deeply about the user query. Consider:\n'
-    prompt += '1. Which specific tools/resources would be most helpful (provide arguments)\n'
-    prompt += '2. What similar queries succeeded before\n'
-    prompt += '3. Domain-specific constraints and best practices\n'
-    prompt += '4. Multiple solution approaches with trade-offs\n'
-    prompt += '5. Tool chains and workflows\n'
+    
+    if (toolRecommendations) {
+      prompt += '1. Use the AI-recommended tools above (they are prioritized for this query)\n'
+      prompt += '2. Which specific tools/resources would be most helpful (provide arguments)\n'
+      prompt += '3. What similar queries succeeded before\n'
+      prompt += '4. Domain-specific constraints and best practices\n'
+      prompt += '5. Multiple solution approaches with trade-offs\n'
+      prompt += '6. Tool chains and workflows\n'
+    } else {
+      prompt += '1. Which specific tools/resources would be most helpful (provide arguments)\n'
+      prompt += '2. What similar queries succeeded before\n'
+      prompt += '3. Domain-specific constraints and best practices\n'
+      prompt += '4. Multiple solution approaches with trade-offs\n'
+      prompt += '5. Tool chains and workflows\n'
+    }
 
     return prompt
   }
@@ -276,15 +327,59 @@ When recommending tools:
   }
 
   /**
+   * Fetch tool recommendations from Tool Memory Agent
+   * 
+   * @param userQuery - User query
+   * @param requestContext - Request context
+   * @param complexityScore - Optional complexity score
+   * @returns Tool recommendations or null if agent is not available
+   */
+  private async fetchToolRecommendations(
+    userQuery: string,
+    requestContext: RequestContext,
+    complexityScore?: ComplexityScore
+  ): Promise<ToolMemoryOutput | null> {
+    try {
+      const toolMemoryAgent = new ToolMemoryAgent()
+      
+      // Try to initialize (may fail if not configured)
+      try {
+        await toolMemoryAgent.initialize()
+      } catch (error: any) {
+        logger.debug(`[ThoughtAgent] Tool Memory Agent not available:`, error.message)
+        return null
+      }
+
+      const mcpContext = await this.fetchMCPContext()
+      const recommendations = await toolMemoryAgent.recommendTools(
+        userQuery,
+        requestContext,
+        complexityScore,
+        mcpContext
+      )
+
+      logger.debug(`[ThoughtAgent] Fetched tool recommendations`, {
+        toolsRecommended: recommendations.recommendedTools.length,
+      })
+
+      return recommendations
+    } catch (error: any) {
+      logger.warn(`[ThoughtAgent] Failed to fetch tool recommendations:`, error.message)
+      return null
+    }
+  }
+
+  /**
    * Generate initial thoughts for a user query
    * 
-   * Enhanced with MCP context and semantic memory.
+   * Enhanced with MCP context, semantic memory, and tool recommendations.
    * 
    * @param userQuery - User's query
    * @param requestContext - Request ID context from Complexity Detector
    * @param context - Additional context (previous thoughts, complexity score, etc.)
    * @param mcpContext - Optional MCP context (will be fetched if not provided)
    * @param similarExamples - Optional similar examples (will be fetched if not provided)
+   * @param toolRecommendations - Optional tool recommendations (will be fetched if not provided)
    * @returns ThoughtAgentOutput with reasoning thoughts
    */
   async generateThought(
@@ -294,9 +389,11 @@ When recommending tools:
       previousThoughts?: Thought[]
       complexityScore?: number
       reasoningPasses?: number
+      complexity?: ComplexityScore
     } = {},
     mcpContext?: MCPContext,
-    similarExamples?: Array<{ example: ThoughtExample; similarity: number }>
+    similarExamples?: Array<{ example: ThoughtExample; similarity: number }>,
+    toolRecommendations?: ToolMemoryOutput
   ): Promise<ThoughtAgentOutput> {
     // Step 1: Add this agent to the request chain
     const updatedContext = this.addToChain(requestContext)
@@ -305,8 +402,23 @@ When recommending tools:
     const contextToUse = mcpContext || await this.fetchMCPContext()
     const examplesToUse = similarExamples || await this.fetchSemanticContext(userQuery)
 
-    // Step 3: Build enhanced system prompt
-    const enhancedSystemPrompt = this.buildEnhancedSystemPrompt(contextToUse, examplesToUse)
+    // Step 3: Fetch tool recommendations if not provided
+    let toolRecs = toolRecommendations
+    if (!toolRecs && context.complexity) {
+      // Try to fetch from Tool Memory Agent
+      toolRecs = await this.fetchToolRecommendations(
+        userQuery,
+        updatedContext,
+        context.complexity
+      )
+    }
+
+    // Step 4: Build enhanced system prompt
+    const enhancedSystemPrompt = this.buildEnhancedSystemPrompt(
+      contextToUse,
+      examplesToUse,
+      toolRecs || undefined
+    )
 
     // Step 4: Build the prompt for the LLM
     const prompt = this.buildThoughtPrompt(userQuery, context)
@@ -374,6 +486,7 @@ When recommending tools:
    * @param passNumber - Which pass this is (2 or 3)
    * @param totalPasses - Total passes planned
    * @param requestContext - Request ID context
+   * @param toolRecommendations - Optional tool recommendations
    * @returns ThoughtAgentOutput with refined thoughts
    */
   async generateThoughtLoop(
@@ -381,7 +494,8 @@ When recommending tools:
     previousThought: Thought,
     passNumber: number,
     totalPasses: number,
-    requestContext: RequestContext
+    requestContext: RequestContext,
+    toolRecommendations?: ToolMemoryOutput
   ): Promise<ThoughtAgentOutput> {
     // Add to chain
     const updatedContext = this.addToChain(requestContext)
@@ -390,8 +504,12 @@ When recommending tools:
     const mcpContext = await this.fetchMCPContext()
     const similarExamples = await this.fetchSemanticContext(userQuery)
     
-    // Build enhanced system prompt
-    const enhancedSystemPrompt = this.buildEnhancedSystemPrompt(mcpContext, similarExamples)
+    // Build enhanced system prompt (include tool recommendations if available)
+    const enhancedSystemPrompt = this.buildEnhancedSystemPrompt(
+      mcpContext,
+      similarExamples,
+      toolRecommendations
+    )
 
     // Build prompt that references previous thought
     const prompt = `Previous thought (pass ${passNumber - 1}/${totalPasses}):

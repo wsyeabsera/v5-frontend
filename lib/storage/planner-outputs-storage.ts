@@ -107,7 +107,7 @@ export class PlannerOutputsStorage {
 
     const result = await collection.findOne(
       { requestId, agentName: 'planner-agent' },
-      { sort: { timestamp: -1 } }
+      { sort: { 'plan.planVersion': -1, timestamp: -1 } }
     )
 
     if (!result) {
