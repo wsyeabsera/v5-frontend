@@ -82,6 +82,11 @@ export class ComplexityDetectionsStorage {
           ? output.requestContext.createdAt 
           : new Date(output.requestContext.createdAt),
       }
+      
+      // Include userQuery if present
+      if (output.requestContext.userQuery) {
+        doc.requestContext.userQuery = output.requestContext.userQuery
+      }
     }
 
     // Upsert by requestId and agentName (one detection per request)

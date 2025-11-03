@@ -1,35 +1,30 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { ThoughtAgent } from '@/lib/agents/thought-agent'
-import { getThoughtOutputsStorage } from '@/lib/storage/thought-outputs-storage'
+import { CriticAgent } from '@/lib/agents/critic-agent'
+import { getCriticOutputsStorage } from '@/lib/storage/critic-outputs-storage'
 import { getAgentConfigStorage } from '@/lib/storage/agent-config-storage'
 import { getRequestMongoDBStorage } from '@/lib/storage/request-mongodb-storage'
-import { AgentConfig, RequestContext } from '@/types'
+import { AgentConfig, RequestContext, Plan } from '@/types'
 import { logger } from '@/utils/logger'
 
 /**
- * API Route for Thought Agent
+ * API Route for Critic Agent
  * 
- * POST /api/agents/thought-agent
+ * POST /api/agents/critic-agent
  * 
  * Body:
  * {
- *   userQuery: string;           // Required: User query to analyze
- *   requestContext: RequestContext; // Required: Request context from Complexity Detector
- *   agentId?: string;            // Optional: Agent config ID (defaults to 'thought-agent')
- *   context?: {                   // Optional: Additional context
- *     previousThoughts?: Thought[];
- *     availableTools?: string[];
- *     complexityScore?: number;
- *     reasoningPasses?: number;
- *   }
+ *   plan: Plan;                   // Required: Plan from Planner Agent
+ *   userQuery: string;            // Required: Original user query
+ *   requestContext: RequestContext; // Required: Request context from Planner Agent
+ *   userFeedback?: Array<{questionId: string, answer: string}>; // Optional: User responses to questions
+ *   agentId?: string;             // Optional: Agent config ID (defaults to 'critic-agent')
  * }
  * 
  * Returns:
  * {
- *   thoughts: Thought[];
- *   primaryApproach: string;
- *   keyInsights: string[];
- *   recommendedTools: string[];
+ *   critique: Critique;
+ *   planId: string;
+ *   requiresUserFeedback: boolean;
  *   requestId: string;
  *   requestContext: RequestContext;
  *   ...
@@ -38,11 +33,19 @@ import { logger } from '@/utils/logger'
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
-    const { userQuery, requestContext, agentId, context } = body
+    const { plan, userQuery, requestContext, userFeedback, agentId } = body
 
     // Validate required fields
+    if (!plan) {
+      logger.warn(`[Critic Agent API] Missing plan`, { body })
+      return NextResponse.json(
+        { error: 'plan is required' },
+        { status: 400 }
+      )
+    }
+
     if (!userQuery || typeof userQuery !== 'string') {
-      logger.warn(`[Thought Agent API] Missing userQuery`, { body })
+      logger.warn(`[Critic Agent API] Missing userQuery`, { body })
       return NextResponse.json(
         { error: 'userQuery (string) is required' },
         { status: 400 }
@@ -50,7 +53,7 @@ export async function POST(req: NextRequest) {
     }
 
     if (!requestContext || !requestContext.requestId) {
-      logger.warn(`[Thought Agent API] Missing requestContext`, { body })
+      logger.warn(`[Critic Agent API] Missing requestContext`, { body })
       return NextResponse.json(
         { error: 'requestContext with requestId is required' },
         { status: 400 }
@@ -58,12 +61,12 @@ export async function POST(req: NextRequest) {
     }
 
     // Resolve agent config
-    const targetAgentId = agentId || 'thought-agent'
+    const targetAgentId = agentId || 'critic-agent'
     const agentStorage = getAgentConfigStorage()
     const agentConfig = await agentStorage.getAgentConfig(targetAgentId)
 
     if (!agentConfig || !agentConfig.enabled) {
-      logger.warn(`[Thought Agent API] Agent config not found or disabled`, { agentId: targetAgentId })
+      logger.warn(`[Critic Agent API] Agent config not found or disabled`, { agentId: targetAgentId })
       return NextResponse.json(
         { error: `Agent '${targetAgentId}' not found or disabled. Please configure it in Settings > Agent Configurations.` },
         { status: 404 }
@@ -71,7 +74,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Initialize agent
-    const agent = new ThoughtAgent()
+    const agent = new CriticAgent()
     await agent.initialize(req.headers)
 
     // Update request context status
@@ -83,24 +86,27 @@ export async function POST(req: NextRequest) {
     }
     await requestStorage.save(updatedRequestContext)
 
-    // Generate thoughts
-    logger.info(`[Thought Agent API] Generating thoughts`, {
+    // Generate critique
+    logger.info(`[Critic Agent API] Generating critique`, {
       requestId: requestContext.requestId,
-      queryLength: userQuery.length,
+      planId: plan.id,
+      stepsCount: plan.steps?.length || 0,
+      hasUserFeedback: !!userFeedback,
     })
 
-    const result = await agent.generateThought(
+    const result = await agent.critiquePlan(
+      plan,
       userQuery,
       updatedRequestContext,
-      context || {}
+      userFeedback
     )
 
     // Store output in MongoDB
     try {
-      const outputsStorage = getThoughtOutputsStorage()
+      const outputsStorage = getCriticOutputsStorage()
       await outputsStorage.save(result)
     } catch (error: any) {
-      logger.error(`[Thought Agent API] Failed to store output:`, error.message)
+      logger.error(`[Critic Agent API] Failed to store output:`, error.message)
       // Don't fail the request if storage fails
     }
 
@@ -108,63 +114,54 @@ export async function POST(req: NextRequest) {
     result.requestContext.status = 'completed'
     await requestStorage.save(result.requestContext)
 
-    logger.info(`[Thought Agent API] Thought generation completed`, {
+    logger.info(`[Critic Agent API] Critique generation completed`, {
       requestId: result.requestId,
-      thoughtsCount: result.thoughts.length,
+      overallScore: result.critique.overallScore.toFixed(2),
+      recommendation: result.critique.recommendation,
+      issuesCount: result.critique.issues.length,
+      questionsCount: result.critique.followUpQuestions.length,
     })
 
     return NextResponse.json(result, { status: 200 })
   } catch (error: any) {
-    logger.error(`[Thought Agent API] Error:`, error.message, error)
+    logger.error(`[Critic Agent API] Error:`, error.message, error)
     return NextResponse.json(
-      { error: error.message || 'Failed to generate thoughts' },
+      { error: error.message || 'Failed to generate critique' },
       { status: 500 }
     )
   }
 }
 
 /**
- * GET endpoint - returns agent config or thought output by requestId
- * 
- * Query params:
- * - requestId: string (optional) - If provided, returns thought output for that request
+ * GET endpoint - returns critique by requestId
  */
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url)
     const requestId = searchParams.get('requestId')
 
-    // If requestId is provided, fetch thought output
-    if (requestId) {
-      const outputsStorage = getThoughtOutputsStorage()
-      const output = await outputsStorage.getByRequestId(requestId)
-      
-      if (!output) {
-        return NextResponse.json(
-          { error: 'Thought output not found for this request' },
-          { status: 404 }
-        )
-      }
-
-      return NextResponse.json(output, { status: 200 })
+    if (!requestId) {
+      return NextResponse.json(
+        { error: 'requestId query parameter is required' },
+        { status: 400 }
+      )
     }
 
-    // Otherwise, return agent config
-    const storage = getAgentConfigStorage()
-    const config = await storage.getAgentConfig('thought-agent')
+    const storage = getCriticOutputsStorage()
+    const output = await storage.getByRequestId(requestId)
 
-    if (!config) {
+    if (!output) {
       return NextResponse.json(
-        { error: 'Agent config not found' },
+        { error: 'Critique not found for this request' },
         { status: 404 }
       )
     }
 
-    return NextResponse.json({ config }, { status: 200 })
+    return NextResponse.json(output, { status: 200 })
   } catch (error: any) {
-    logger.error(`[Thought Agent API] GET error:`, error.message, error)
+    logger.error(`[Critic Agent API] GET error:`, error.message, error)
     return NextResponse.json(
-      { error: error.message || 'Failed to fetch agent config' },
+      { error: error.message || 'Failed to fetch critique' },
       { status: 500 }
     )
   }
@@ -178,8 +175,8 @@ export async function PUT(req: NextRequest) {
     const body = await req.json()
     const config: AgentConfig = body
 
-    // Ensure agentId is thought-agent
-    config.agentId = 'thought-agent'
+    // Ensure agentId is critic-agent
+    config.agentId = 'critic-agent'
 
     const storage = getAgentConfigStorage()
     const success = await storage.saveAgentConfig(config)
@@ -192,10 +189,10 @@ export async function PUT(req: NextRequest) {
     }
 
     // Return the updated config
-    const updatedConfig = await storage.getAgentConfig('thought-agent')
+    const updatedConfig = await storage.getAgentConfig('critic-agent')
     return NextResponse.json({ config: updatedConfig }, { status: 200 })
   } catch (error: any) {
-    logger.error(`[Thought Agent API] PUT error:`, error.message, error)
+    logger.error(`[Critic Agent API] PUT error:`, error.message, error)
     return NextResponse.json(
       { error: error.message || 'Failed to update agent config' },
       { status: 500 }
@@ -209,7 +206,7 @@ export async function PUT(req: NextRequest) {
 export async function DELETE() {
   try {
     const storage = getAgentConfigStorage()
-    const success = await storage.deleteAgentConfig('thought-agent')
+    const success = await storage.deleteAgentConfig('critic-agent')
 
     if (!success) {
       return NextResponse.json(
@@ -223,11 +220,10 @@ export async function DELETE() {
       { status: 200 }
     )
   } catch (error: any) {
-    logger.error(`[Thought Agent API] DELETE error:`, error.message, error)
+    logger.error(`[Critic Agent API] DELETE error:`, error.message, error)
     return NextResponse.json(
       { error: error.message || 'Failed to delete agent config' },
       { status: 500 }
     )
   }
 }
-

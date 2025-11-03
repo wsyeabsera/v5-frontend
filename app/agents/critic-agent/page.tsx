@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, Suspense } from 'react'
-import { ThoughtAgentOutput, AgentConfig, RequestContext } from '@/types'
+import { CriticAgentOutput, AgentConfig, RequestContext, Plan } from '@/types'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -9,27 +9,30 @@ import { Badge } from '@/components/ui/badge'
 import { Breadcrumbs } from '@/components/ui/breadcrumbs'
 import { PipelineBanner } from '@/components/agents/PipelineBanner'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
-import { getRequestsWithComplexityDetector } from '@/lib/api/requests-api'
+import { getRequestsWithPlannerAgent } from '@/lib/api/requests-api'
 import { useStore } from '@/lib/store'
 import { useAgentConfigs, useModels } from '@/lib/queries'
-import { Sparkles, Loader2, Settings, Check, Brain, Target, AlertCircle, Wrench, Lightbulb, Clock, ChevronDown, Inbox, History } from 'lucide-react'
+import { Loader2, Settings, Check, ShieldCheck, AlertTriangle, TrendingUp, TrendingDown, MessageSquare, Clock, History, ChevronDown, Inbox } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
+import { useSearchParams } from 'next/navigation'
+import { Textarea } from '@/components/ui/textarea'
 
-function ThoughtAgentContent() {
+function CriticAgentContent() {
   const searchParams = useSearchParams()
   const urlRequestId = searchParams.get('requestId')
   
-  const [requests, setRequests] = useState<(RequestContext & { thoughtOutputExists: boolean })[]>([])
+  const [requests, setRequests] = useState<(RequestContext & { critiqueOutputExists: boolean })[]>([])
   const [loadingRequests, setLoadingRequests] = useState(true)
   const [loading, setLoading] = useState(false)
-  const [result, setResult] = useState<ThoughtAgentOutput | null>(null)
+  const [result, setResult] = useState<CriticAgentOutput | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [selectedRequestId, setSelectedRequestId] = useState<string | null>(null)
   const [selectedAgentId, setSelectedAgentId] = useState<string>('')
   const [configOpen, setConfigOpen] = useState(false)
+  const [userFeedback, setUserFeedback] = useState<{ questionId: string; answer: string }[]>([])
+  const [submittingFeedback, setSubmittingFeedback] = useState(false)
   
   const { data: agentConfigsData } = useAgentConfigs()
   const { data: modelsData } = useModels()
@@ -37,12 +40,12 @@ function ThoughtAgentContent() {
   // Filter enabled agent configs
   const enabledConfigs = (agentConfigsData || []).filter((config: AgentConfig) => config.enabled)
   
-  // Default to thought-agent if it exists
+  // Default to critic-agent if it exists
   useEffect(() => {
     if (!selectedAgentId && enabledConfigs.length > 0) {
-      const thoughtAgent = enabledConfigs.find((c: AgentConfig) => c.agentId === 'thought-agent')
-      if (thoughtAgent) {
-        setSelectedAgentId('thought-agent')
+      const criticAgent = enabledConfigs.find((c: AgentConfig) => c.agentId === 'critic-agent')
+      if (criticAgent) {
+        setSelectedAgentId('critic-agent')
       } else {
         setSelectedAgentId(enabledConfigs[0].agentId)
       }
@@ -68,7 +71,7 @@ function ThoughtAgentContent() {
     setLoadingRequests(true)
     setError(null)
     try {
-      const data = await getRequestsWithComplexityDetector()
+      const data = await getRequestsWithPlannerAgent()
       setRequests(data)
     } catch (err: any) {
       setError(err.message || 'Failed to load requests')
@@ -91,7 +94,7 @@ function ThoughtAgentContent() {
 
   // Load config open state from localStorage
   useEffect(() => {
-    const saved = localStorage.getItem('thought-agent-config-open')
+    const saved = localStorage.getItem('critic-agent-config-open')
     if (saved !== null) {
       setConfigOpen(JSON.parse(saved))
     }
@@ -99,45 +102,60 @@ function ThoughtAgentContent() {
 
   // Save config open state to localStorage
   useEffect(() => {
-    localStorage.setItem('thought-agent-config-open', JSON.stringify(configOpen))
+    localStorage.setItem('critic-agent-config-open', JSON.stringify(configOpen))
   }, [configOpen])
 
-  const handleRequestSelect = async (request: RequestContext & { thoughtOutputExists: boolean }) => {
-    if (!selectedAgentId || !selectedConfig) {
-      setError('Please select an agent configuration')
-      return
-    }
-
+  const handleRequestSelect = async (request: RequestContext & { critiqueOutputExists: boolean }) => {
     setSelectedRequestId(request.requestId)
     setLoading(true)
     setError(null)
     setResult(null)
+    setUserFeedback([])
+
+    if (!selectedAgentId || !selectedConfig) {
+      setError('Please select an agent configuration')
+      setLoading(false)
+      return
+    }
 
     try {
-      const response = await fetch('/api/agents/thought-agent', {
+      // First, get the planner output for this request
+      const plannerResponse = await fetch(`/api/agents/planner-agent/history/${request.requestId}`)
+      if (!plannerResponse.ok) {
+        throw new Error('Failed to fetch planner output for this request')
+      }
+      const plannerData = await plannerResponse.json()
+      
+      if (!plannerData.plan) {
+        throw new Error('No plan found for this request. Please generate a plan first.')
+      }
+
+      // Now critique the plan
+      const response = await fetch('/api/agents/critic-agent', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          userQuery: request.userQuery || '',
-          requestContext: request,
+          plan: plannerData.plan,
+          userQuery: plannerData.requestContext?.userQuery || request.userQuery || plannerData.plan.goal || 'No user query available',
+          requestContext: plannerData.requestContext || request,
           agentId: selectedAgentId,
         }),
       })
 
       if (!response.ok) {
         const errorData = await response.json()
-        throw new Error(errorData.error || 'Failed to generate thoughts')
+        throw new Error(errorData.error || 'Failed to generate critique')
       }
 
       const data = await response.json()
       setResult(data)
       
-      // Update the request's thought output status
+      // Update the request's critique output status
       setRequests(prev => prev.map(r => 
         r.requestId === request.requestId 
-          ? { ...r, thoughtOutputExists: true }
+          ? { ...r, critiqueOutputExists: true }
           : r
       ))
     } catch (err: any) {
@@ -147,22 +165,76 @@ function ThoughtAgentContent() {
     }
   }
 
+  const handleSubmitFeedback = async () => {
+    if (!result || userFeedback.length === 0) return
+
+    setSubmittingFeedback(true)
+    setError(null)
+
+    try {
+      // Get the planner output again
+      const plannerResponse = await fetch(`/api/agents/planner-agent/history/${result.requestId}`)
+      if (!plannerResponse.ok) {
+        throw new Error('Failed to fetch planner output')
+      }
+      const plannerData = await plannerResponse.json()
+
+      // Regenerate critique with user feedback
+      const response = await fetch('/api/agents/critic-agent', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          plan: plannerData.plan,
+          userQuery: result.requestContext.userQuery || plannerData.plan.goal || 'No user query available',
+          requestContext: result.requestContext,
+          userFeedback,
+          agentId: selectedAgentId,
+        }),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Failed to regenerate critique')
+      }
+
+      const data = await response.json()
+      setResult(data)
+      setUserFeedback([])
+    } catch (err: any) {
+      setError(err.message || 'An error occurred')
+    } finally {
+      setSubmittingFeedback(false)
+    }
+  }
+
+  const updateFeedback = (questionId: string, answer: string) => {
+    setUserFeedback(prev => {
+      const existing = prev.find(f => f.questionId === questionId)
+      if (existing) {
+        return prev.map(f => f.questionId === questionId ? { questionId, answer } : f)
+      }
+      return [...prev, { questionId, answer }]
+    })
+  }
+
   return (
     <div className="min-h-screen p-6">
       <div className="max-w-7xl mx-auto space-y-6">
         <Breadcrumbs items={[
           { label: 'Agent Pipeline', href: '/agents/pipeline' },
-          { label: 'Thought Agent' },
+          { label: 'Critic Agent' },
         ]} />
-        <PipelineBanner currentAgent="thought-agent" />
+        <PipelineBanner currentAgent="critic-agent" />
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold mb-1">Thought Agent</h1>
+            <h1 className="text-2xl font-bold mb-1">Critic Agent</h1>
             <p className="text-[13px] text-muted-foreground">
-              Generate deep reasoning thoughts and explore multiple solution approaches
+              Evaluate plans for errors, risks, and completeness before execution
             </p>
           </div>
-          <Link href="/agents/thought-agent/history">
+          <Link href="/agents/critic-agent/history">
             <Button variant="outline" size="sm" className="gap-2">
               <History className="w-4 h-4" />
               View History
@@ -249,7 +321,7 @@ function ThoughtAgentContent() {
                         </SelectContent>
                       </Select>
                       <p className="text-xs text-muted-foreground">
-                        Choose which agent configuration to use for thought generation. The selected config's model and parameters will be used for LLM calls.
+                        Choose which agent configuration to use for critique. The selected config's model and parameters will be used for LLM calls.
                       </p>
                     </div>
 
@@ -299,7 +371,7 @@ function ThoughtAgentContent() {
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <Brain className="w-5 h-5" />
+                  <ShieldCheck className="w-5 h-5" />
                   Select a Request
                 </CardTitle>
               </CardHeader>
@@ -311,9 +383,9 @@ function ThoughtAgentContent() {
                   </div>
                 ) : requests.length === 0 ? (
                   <div className="text-center py-8 text-sm text-muted-foreground">
-                    No requests found with complexity-detector in the agent chain.
+                    No requests found with planner-agent in the agent chain.
                     <br />
-                    <span className="text-xs mt-1">Generate some requests in the Complexity Detector first.</span>
+                    <span className="text-xs mt-1">Generate some plans in the Planner Agent first.</span>
                   </div>
                 ) : (
                   <div className="space-y-2">
@@ -333,10 +405,10 @@ function ThoughtAgentContent() {
                               <code className="text-xs font-mono bg-muted px-2 py-1 rounded">
                                 {request.requestId}
                               </code>
-                              {request.thoughtOutputExists && (
+                              {request.critiqueOutputExists && (
                                 <Badge variant="outline" className="bg-green-500/10 text-green-600 dark:text-green-400 border-green-200 dark:border-green-900">
                                   <Check className="w-3 h-3 mr-1" />
-                                  Has Thoughts
+                                  Has Critique
                                 </Badge>
                               )}
                             </div>
@@ -386,248 +458,19 @@ function ThoughtAgentContent() {
                 <CardContent className="pt-6">
                   <div className="flex items-center justify-center py-12">
                     <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
-                    <span className="ml-2 text-sm text-muted-foreground">Generating thoughts...</span>
+                    <span className="ml-2 text-sm text-muted-foreground">Evaluating plan...</span>
                   </div>
                 </CardContent>
               </Card>
             ) : result ? (
-          <div className="space-y-6">
-            {/* Request Info */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Request Info</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2">
-                <div className="text-sm">
-                  <span className="text-muted-foreground">Request ID:</span>
-                  <code className="ml-2 px-2 py-1 bg-muted rounded text-xs">
-                    {result.requestId}
-                  </code>
-                </div>
-                <div className="text-sm">
-                  <span className="text-muted-foreground">Agent Chain:</span>
-                  <span className="ml-2">{result.requestContext.agentChain.join(' → ')}</span>
-                </div>
-                {result.complexityScore !== undefined && (
-                  <div className="text-sm">
-                    <span className="text-muted-foreground">Complexity Score:</span>
-                    <span className="ml-2">{(result.complexityScore * 100).toFixed(0)}%</span>
-                  </div>
-                )}
-                {result.reasoningPass !== undefined && (
-                  <div className="text-sm">
-                    <span className="text-muted-foreground">Reasoning Pass:</span>
-                    <span className="ml-2">{result.reasoningPass} / {result.totalPasses || 1}</span>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Primary Thought */}
-            {result.thoughts && result.thoughts.length > 0 && (
-              <>
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <Brain className="w-5 h-5" />
-                      Reasoning
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="p-4 bg-muted rounded-lg">
-                      <div className="prose prose-sm dark:prose-invert max-w-none">
-                        <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                          {result.thoughts[0].reasoning}
-                        </ReactMarkdown>
-                      </div>
-                    </div>
-                    {result.thoughts[0].confidence !== undefined && (
-                      <div className="mt-4">
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="text-xs text-muted-foreground">Confidence</span>
-                          <span className="text-sm font-semibold">
-                            {(result.thoughts[0].confidence * 100).toFixed(0)}%
-                          </span>
-                        </div>
-                        <div className="w-full bg-muted h-2 rounded-full overflow-hidden">
-                          <div
-                            className="h-full bg-primary transition-all"
-                            style={{ width: `${result.thoughts[0].confidence * 100}%` }}
-                          />
-                        </div>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-
-                {/* Approaches */}
-                {result.thoughts[0].approaches && result.thoughts[0].approaches.length > 0 && (
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="flex items-center gap-2">
-                        <Target className="w-5 h-5" />
-                        Approaches
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <ul className="space-y-2">
-                        {result.thoughts[0].approaches.map((approach, i) => (
-                          <li key={i} className="flex items-start gap-2">
-                            <Badge variant="outline" className="mt-0.5">{i + 1}</Badge>
-                            <div className="flex-1 prose prose-sm dark:prose-invert max-w-none">
-                              <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                                {approach}
-                              </ReactMarkdown>
-                            </div>
-                          </li>
-                        ))}
-                      </ul>
-                      {result.primaryApproach && (
-                        <div className="mt-4 p-3 rounded-lg bg-primary/10 border border-primary/20">
-                          <p className="text-xs text-muted-foreground mb-1">Primary Approach:</p>
-                          <div className="prose prose-sm dark:prose-invert max-w-none">
-                            <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                              {result.primaryApproach}
-                            </ReactMarkdown>
-                          </div>
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-                )}
-
-                {/* Constraints & Assumptions */}
-                {(result.thoughts[0].constraints?.length > 0 || result.thoughts[0].assumptions?.length > 0) && (
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Constraints & Assumptions</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="grid grid-cols-2 gap-4">
-                        {result.thoughts[0].constraints && result.thoughts[0].constraints.length > 0 && (
-                          <div>
-                            <h3 className="font-medium mb-2 text-sm flex items-center gap-2">
-                              <AlertCircle className="w-4 h-4" />
-                              Constraints
-                            </h3>
-                            <ul className="text-sm space-y-1">
-                              {result.thoughts[0].constraints.map((c, i) => (
-                                <li key={i} className="flex items-start gap-2">
-                                  <span className="text-muted-foreground">•</span>
-                                  <div className="prose prose-sm dark:prose-invert max-w-none flex-1">
-                                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                                      {c}
-                                    </ReactMarkdown>
-                                  </div>
-                                </li>
-                              ))}
-                            </ul>
-                          </div>
-                        )}
-                        {result.thoughts[0].assumptions && result.thoughts[0].assumptions.length > 0 && (
-                          <div>
-                            <h3 className="font-medium mb-2 text-sm flex items-center gap-2">
-                              <Lightbulb className="w-4 h-4" />
-                              Assumptions
-                            </h3>
-                            <ul className="text-sm space-y-1">
-                              {result.thoughts[0].assumptions.map((a, i) => (
-                                <li key={i} className="flex items-start gap-2">
-                                  <span className="text-muted-foreground">•</span>
-                                  <div className="prose prose-sm dark:prose-invert max-w-none flex-1">
-                                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                                      {a}
-                                    </ReactMarkdown>
-                                  </div>
-                                </li>
-                              ))}
-                            </ul>
-                          </div>
-                        )}
-                      </div>
-                    </CardContent>
-                  </Card>
-                )}
-
-                {/* Uncertainties */}
-                {result.thoughts[0].uncertainties && result.thoughts[0].uncertainties.length > 0 && (
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Uncertainties</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <ul className="space-y-1 text-sm">
-                        {result.thoughts[0].uncertainties.map((u, i) => (
-                          <li key={i} className="flex items-start gap-2">
-                            <span className="text-muted-foreground">•</span>
-                            <div className="prose prose-sm dark:prose-invert max-w-none flex-1">
-                              <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                                {u}
-                              </ReactMarkdown>
-                            </div>
-                          </li>
-                        ))}
-                      </ul>
-                    </CardContent>
-                  </Card>
-                )}
-              </>
-            )}
-
-            {/* Key Insights */}
-            {result.keyInsights && result.keyInsights.length > 0 && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Lightbulb className="w-5 h-5" />
-                    Key Insights
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <ul className="space-y-2">
-                    {result.keyInsights.map((insight, i) => (
-                      <li key={i} className="text-sm flex items-start gap-2">
-                        <Badge variant="outline" className="mt-0.5">•</Badge>
-                        <div className="prose prose-sm dark:prose-invert max-w-none flex-1">
-                          <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                            {insight}
-                          </ReactMarkdown>
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
-                </CardContent>
-              </Card>
-            )}
-
-            {/* Recommended Tools */}
-            {result.recommendedTools && result.recommendedTools.length > 0 && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Wrench className="w-5 h-5" />
-                    Recommended Tools
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex flex-wrap gap-2">
-                    {result.recommendedTools.map((tool, i) => (
-                      <Badge key={i} variant="secondary" className="gap-1">
-                        {tool}
-                      </Badge>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-          </div>
+              <CritiqueResultsDisplay result={result} userFeedback={userFeedback} updateFeedback={updateFeedback} onSubmitFeedback={handleSubmitFeedback} submittingFeedback={submittingFeedback} />
             ) : (
               <Card>
                 <CardContent className="pt-6">
                   <div className="flex flex-col items-center justify-center py-12 text-center">
                     <Inbox className="w-12 h-12 text-muted-foreground/50 mb-3" />
                     <p className="text-sm font-medium text-muted-foreground mb-1">No Results Yet</p>
-                    <p className="text-xs text-muted-foreground">Select a request to generate thought analysis results</p>
+                    <p className="text-xs text-muted-foreground">Select a request to generate critique results</p>
                   </div>
                 </CardContent>
               </Card>
@@ -639,10 +482,287 @@ function ThoughtAgentContent() {
   )
 }
 
-export default function ThoughtAgentPage() {
+function CritiqueResultsDisplay({ 
+  result, 
+  userFeedback, 
+  updateFeedback, 
+  onSubmitFeedback, 
+  submittingFeedback 
+}: { 
+  result: CriticAgentOutput
+  userFeedback: { questionId: string; answer: string }[]
+  updateFeedback: (questionId: string, answer: string) => void
+  onSubmitFeedback: () => void
+  submittingFeedback: boolean
+}) {
+  const { critique } = result
+  
+  // Get recommendation badge styling
+  const getRecommendationBadge = (recommendation: string) => {
+    switch (recommendation) {
+      case 'approve':
+        return <Badge className="bg-green-500/10 text-green-600 dark:text-green-400 border-green-200 dark:border-green-900">Approve</Badge>
+      case 'revise':
+        return <Badge className="bg-yellow-500/10 text-yellow-600 dark:text-yellow-400 border-yellow-200 dark:border-yellow-900">Revise</Badge>
+      case 'reject':
+        return <Badge className="bg-red-500/10 text-red-600 dark:text-red-400 border-red-200 dark:border-red-900">Reject</Badge>
+      default:
+        return <Badge variant="secondary">{recommendation}</Badge>
+    }
+  }
+
+  // Get severity badge styling
+  const getSeverityBadge = (severity: string) => {
+    switch (severity) {
+      case 'critical':
+        return <Badge className="bg-red-500/10 text-red-600 dark:text-red-400 border-red-200 dark:border-red-900">Critical</Badge>
+      case 'high':
+        return <Badge className="bg-orange-500/10 text-orange-600 dark:text-orange-400 border-orange-200 dark:border-orange-900">High</Badge>
+      case 'medium':
+        return <Badge className="bg-yellow-500/10 text-yellow-600 dark:text-yellow-400 border-yellow-200 dark:border-yellow-900">Medium</Badge>
+      case 'low':
+        return <Badge className="bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-900">Low</Badge>
+      default:
+        return <Badge variant="secondary">{severity}</Badge>
+    }
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Request Info */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Request Info</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          <div className="text-sm">
+            <span className="text-muted-foreground">Request ID:</span>
+            <code className="ml-2 px-2 py-1 bg-muted rounded text-xs">
+              {result.requestId}
+            </code>
+          </div>
+          <div className="text-sm">
+            <span className="text-muted-foreground">Plan ID:</span>
+            <code className="ml-2 px-2 py-1 bg-muted rounded text-xs">
+              {result.planId}
+            </code>
+          </div>
+          <div className="text-sm">
+            <span className="text-muted-foreground">Agent Chain:</span>
+            <span className="ml-2">{result.requestContext.agentChain.join(' → ')}</span>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Overall Score */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <ShieldCheck className="w-5 h-5" />
+            Overall Score
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-sm font-medium">{(critique.overallScore * 100).toFixed(0)}%</span>
+            {getRecommendationBadge(critique.recommendation)}
+          </div>
+          <div className="w-full bg-muted h-3 rounded-full overflow-hidden">
+            <div
+              className={`h-full transition-all ${
+                critique.overallScore >= 0.8 ? 'bg-green-500' :
+                critique.overallScore >= 0.6 ? 'bg-yellow-500' :
+                'bg-red-500'
+              }`}
+              style={{ width: `${critique.overallScore * 100}%` }}
+            />
+          </div>
+          <p className="text-xs text-muted-foreground mt-2">{critique.rationale}</p>
+        </CardContent>
+      </Card>
+
+      {/* Detailed Scores */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Detailed Scores</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {[
+            { name: 'Feasibility', score: critique.feasibilityScore, icon: TrendingUp },
+            { name: 'Correctness', score: critique.correctnessScore, icon: ShieldCheck },
+            { name: 'Efficiency', score: critique.efficiencyScore, icon: TrendingUp },
+            { name: 'Safety', score: critique.safetyScore, icon: AlertTriangle },
+          ].map(({ name, score, icon: Icon }) => (
+            <div key={name}>
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <Icon className="w-4 h-4 text-muted-foreground" />
+                  <span className="text-sm font-medium">{name}</span>
+                </div>
+                <span className="text-sm">{(score * 100).toFixed(0)}%</span>
+              </div>
+              <div className="w-full bg-muted h-2 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-primary transition-all"
+                  style={{ width: `${score * 100}%` }}
+                />
+              </div>
+            </div>
+          ))}
+        </CardContent>
+      </Card>
+
+      {/* Issues */}
+      {critique.issues.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <AlertTriangle className="w-5 h-5" />
+              Issues ({critique.issues.length})
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {['critical', 'high', 'medium', 'low'].map(severity => {
+                const issues = critique.issues.filter(i => i.severity === severity)
+                if (issues.length === 0) return null
+                
+                return (
+                  <div key={severity}>
+                    <div className="flex items-center gap-2 mb-2">
+                      {getSeverityBadge(severity)}
+                      <span className="text-xs text-muted-foreground">{issues.length} issue(s)</span>
+                    </div>
+                    {issues.map((issue, idx) => (
+                      <div key={idx} className="p-3 border rounded-lg mb-2">
+                        <div className="flex items-start gap-2 mb-2">
+                          <Badge variant="outline" className="text-xs">{issue.category}</Badge>
+                          {issue.affectedSteps && issue.affectedSteps.length > 0 && (
+                            <Badge variant="secondary" className="text-xs">
+                              Steps: {issue.affectedSteps.map(s => s.replace('step-', '')).join(', ')}
+                            </Badge>
+                          )}
+                        </div>
+                        <p className="text-sm mb-1">{issue.description}</p>
+                        <p className="text-xs text-muted-foreground italic">Suggestion: {issue.suggestion}</p>
+                      </div>
+                    ))}
+                  </div>
+                )
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Follow-Up Questions */}
+      {critique.followUpQuestions.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <MessageSquare className="w-5 h-5" />
+              Follow-Up Questions
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {critique.followUpQuestions.map((question) => (
+              <div key={question.id} className="space-y-2">
+                <div className="flex items-start gap-2">
+                  <Badge variant="outline" className="text-xs">{question.category}</Badge>
+                  <Badge variant="secondary" className="text-xs">{question.priority}</Badge>
+                </div>
+                <p className="text-sm font-medium">{question.question}</p>
+                {!question.userAnswer ? (
+                  <Textarea
+                    placeholder="Your answer..."
+                    value={userFeedback.find(f => f.questionId === question.id)?.answer || ''}
+                    onChange={(e) => updateFeedback(question.id, e.target.value)}
+                    rows={3}
+                    className="text-sm"
+                  />
+                ) : (
+                  <div className="p-3 bg-muted rounded-lg">
+                    <p className="text-xs text-muted-foreground mb-1">Your answer:</p>
+                    <p className="text-sm">{question.userAnswer}</p>
+                  </div>
+                )}
+              </div>
+            ))}
+            {critique.followUpQuestions.some(q => !q.userAnswer) && (
+              <Button
+                onClick={onSubmitFeedback}
+                disabled={submittingFeedback || userFeedback.length === 0}
+                className="w-full gap-2"
+              >
+                {submittingFeedback ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Regenerating Critique...
+                  </>
+                ) : (
+                  <>
+                    <MessageSquare className="w-4 h-4" />
+                    Submit Feedback
+                  </>
+                )}
+              </Button>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Strengths */}
+      {critique.strengths.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <TrendingUp className="w-5 h-5" />
+              Strengths
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ul className="space-y-2">
+              {critique.strengths.map((strength, idx) => (
+                <li key={idx} className="text-sm flex items-start gap-2">
+                  <Check className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
+                  <span>{strength}</span>
+                </li>
+              ))}
+            </ul>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Suggestions */}
+      {critique.suggestions.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <TrendingDown className="w-5 h-5" />
+              Suggestions
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ul className="space-y-2">
+              {critique.suggestions.map((suggestion, idx) => (
+                <li key={idx} className="text-sm flex items-start gap-2">
+                  <span className="text-muted-foreground">•</span>
+                  <span>{suggestion}</span>
+                </li>
+              ))}
+            </ul>
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  )
+}
+
+export default function CriticAgentPage() {
   return (
     <Suspense fallback={<div className="min-h-screen p-6"><div className="max-w-6xl mx-auto">Loading...</div></div>}>
-      <ThoughtAgentContent />
+      <CriticAgentContent />
     </Suspense>
   )
 }
+

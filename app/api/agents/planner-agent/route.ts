@@ -80,6 +80,7 @@ export async function POST(req: NextRequest) {
     const requestStorage = getRequestMongoDBStorage()
     const updatedRequestContext: RequestContext = {
       ...requestContext,
+      userQuery,
       status: 'in-progress',
     }
     await requestStorage.save(updatedRequestContext)

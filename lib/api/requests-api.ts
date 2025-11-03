@@ -237,3 +237,26 @@ export async function getRequestsWithThoughtAgent(): Promise<(RequestContext & {
   }))
 }
 
+/**
+ * Get requests with planner-agent in their agent chain
+ * 
+ * Returns requests with a critiqueOutputExists boolean indicating
+ * whether critic output already exists for each request.
+ */
+export async function getRequestsWithPlannerAgent(): Promise<(RequestContext & { critiqueOutputExists: boolean })[]> {
+  const response = await fetch(`${API_BASE}/with-planner-agent`)
+  
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}))
+    const errorMessage = errorData.error || `Failed to fetch requests: ${response.statusText}`
+    throw new Error(errorMessage)
+  }
+  
+  const data = await response.json()
+  // Convert date strings back to Date objects
+  return data.map((req: any) => ({
+    ...req,
+    createdAt: new Date(req.createdAt),
+  }))
+}
+

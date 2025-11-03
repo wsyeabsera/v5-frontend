@@ -184,9 +184,9 @@ function PlannerAgentContent() {
         </div>
 
         {/* Split-screen Layout */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Left Column: Form */}
-          <div className="space-y-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-[calc(100vh-240px)]">
+          {/* Left Column: Request List - independently scrollable */}
+          <div className="space-y-6 overflow-y-auto pr-2">
             {/* Agent Config Selector - Collapsible */}
             <Collapsible open={configOpen} onOpenChange={setConfigOpen}>
               <Card>
@@ -392,8 +392,8 @@ function PlannerAgentContent() {
             )}
           </div>
 
-          {/* Right Column: Results */}
-          <div className="space-y-6">
+          {/* Right Column: Results - independently scrollable */}
+          <div className="space-y-6 overflow-y-auto pr-2">
             {loading ? (
               <Card>
                 <CardContent className="pt-6">

@@ -384,6 +384,56 @@ export interface PlanExample {
 }
 
 /**
+ * Critique Issue - Individual problem found in a plan
+ */
+export interface CritiqueIssue {
+  severity: 'low' | 'medium' | 'high' | 'critical';
+  category: 'logic' | 'feasibility' | 'efficiency' | 'safety' | 'completeness';
+  description: string;
+  suggestion: string;
+  affectedSteps?: string[]; // Step IDs that have this issue
+}
+
+/**
+ * Follow-Up Question - Question when plan needs clarification
+ */
+export interface FollowUpQuestion {
+  id: string;
+  question: string;
+  category: 'missing-info' | 'ambiguous' | 'assumption' | 'constraint';
+  priority: 'low' | 'medium' | 'high';
+  userAnswer?: string; // User's response to the question
+}
+
+/**
+ * Critique - Complete evaluation of a plan
+ */
+export interface Critique {
+  id: string;
+  planId: string;
+  overallScore: number; // 0.0-1.0
+  feasibilityScore: number;
+  correctnessScore: number;
+  efficiencyScore: number;
+  safetyScore: number;
+  issues: CritiqueIssue[];
+  followUpQuestions: FollowUpQuestion[];
+  strengths: string[];
+  suggestions: string[];
+  recommendation: 'approve' | 'revise' | 'reject';
+  rationale: string;
+}
+
+/**
+ * Critic Agent Output
+ */
+export interface CriticAgentOutput extends AgentOutput {
+  critique: Critique;
+  planId: string; // ID of the plan being critiqued
+  requiresUserFeedback: boolean; // Whether user input is needed to proceed
+}
+
+/**
  * MCP Context - Information about available MCP resources
  */
 export interface MCPContext {

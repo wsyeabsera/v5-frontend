@@ -1,6 +1,6 @@
 'use client'
 
-import { Home, MessageSquare, Settings, ChevronLeft, ChevronRight, List, Sparkles, Database, Cpu, Brain, GraduationCap, ListChecks, ChevronDown } from 'lucide-react'
+import { Home, MessageSquare, Settings, ChevronLeft, ChevronRight, List, Sparkles, Database, Cpu, Brain, GraduationCap, ListChecks, ShieldCheck, ChevronDown } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useState, useEffect } from 'react'
@@ -23,6 +23,7 @@ const navigation = [
       { name: 'Complexity Detector', href: '/agents/complexity-detector', icon: Sparkles },
       { name: 'Thought Agent', href: '/agents/thought-agent', icon: Brain },
       { name: 'Planner Agent', href: '/agents/planner-agent', icon: ListChecks },
+      { name: 'Critic Agent', href: '/agents/critic-agent', icon: ShieldCheck },
     ]
   },
   {
@@ -30,6 +31,7 @@ const navigation = [
     items: [
       { name: 'Complexity Examples', href: '/agents/complexity-examples', icon: Database },
       { name: 'Thought Examples', href: '/agents/thought-examples', icon: GraduationCap },
+      { name: 'Planner Examples', href: '/agents/planner-examples', icon: ListChecks },
     ]
   },
   {

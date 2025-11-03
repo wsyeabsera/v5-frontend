@@ -1,6 +1,6 @@
 'use client'
 
-import { Sparkles, Brain, ListChecks, ChevronRight, Info, X } from 'lucide-react'
+import { Sparkles, Brain, ListChecks, ShieldCheck, ChevronRight, Info, X } from 'lucide-react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -41,6 +41,13 @@ const pipelineAgents: PipelineAgent[] = [
     href: '/agents/planner-agent',
     icon: ListChecks,
     description: 'Convert reasoning thoughts into structured, executable action plans',
+  },
+  {
+    id: 'critic-agent',
+    name: 'Critic Agent',
+    href: '/agents/critic-agent',
+    icon: ShieldCheck,
+    description: 'Evaluate plans for errors, risks, and completeness before execution',
   },
 ]
 
@@ -156,12 +163,13 @@ export function PipelineBanner({ currentAgent, requestId }: PipelineBannerProps)
               <h4 className="text-xs font-semibold mb-2">Pipeline Flow</h4>
               <div className="space-y-2 text-xs text-muted-foreground">
                 <p className="leading-relaxed">
-                  The agent pipeline processes requests through three stages. Each agent builds on the previous stage's output.
+                  The agent pipeline processes requests through four stages. Each agent builds on the previous stage's output.
                 </p>
                 <ul className="space-y-1 list-disc list-inside ml-1">
                   <li><strong>Complexity Detector:</strong> Analyze and classify query complexity</li>
                   <li><strong>Thought Agent:</strong> Generate reasoning from complexity analysis</li>
                   <li><strong>Planner Agent:</strong> Create executable plans from thoughts</li>
+                  <li><strong>Critic Agent:</strong> Evaluate plans for errors and completeness</li>
                 </ul>
               </div>
             </div>

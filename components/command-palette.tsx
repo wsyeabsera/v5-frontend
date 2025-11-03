@@ -4,7 +4,7 @@ import * as React from 'react'
 import { useRouter } from 'next/navigation'
 import { useTheme } from 'next-themes'
 import { Command } from 'cmdk'
-import { Home, MessageSquare, Settings, Moon, Sun, Search, Sparkles, Brain, ListChecks, GitBranch, List } from 'lucide-react'
+import { Home, MessageSquare, Settings, Moon, Sun, Search, Sparkles, Brain, ListChecks, GitBranch, List, Database, GraduationCap } from 'lucide-react'
 
 export function CommandPalette() {
   const [open, setOpen] = React.useState(false)
@@ -139,6 +139,41 @@ export function CommandPalette() {
                 <div className="flex items-center gap-2">
                   <ListChecks className="h-3.5 w-3.5" />
                   <span>Planner Agent</span>
+                </div>
+              </Command.Item>
+            </Command.Group>
+
+            <Command.Separator className="my-1 h-px bg-border/40 dark:bg-border/20" />
+
+            <Command.Group className="mb-1">
+              <div className="px-2 py-1.5 text-[10px] uppercase font-semibold text-muted-foreground/70 tracking-wider">
+                Training Data
+              </div>
+              <Command.Item
+                onSelect={() => runCommand(() => router.push('/agents/complexity-examples'))}
+                className="flex cursor-pointer items-center justify-between gap-2 rounded-md px-2 py-1.5 text-[13px] hover:bg-accent/10 aria-selected:bg-accent/10"
+              >
+                <div className="flex items-center gap-2">
+                  <Database className="h-3.5 w-3.5" />
+                  <span>Complexity Examples</span>
+                </div>
+              </Command.Item>
+              <Command.Item
+                onSelect={() => runCommand(() => router.push('/agents/thought-examples'))}
+                className="flex cursor-pointer items-center justify-between gap-2 rounded-md px-2 py-1.5 text-[13px] hover:bg-accent/10 aria-selected:bg-accent/10"
+              >
+                <div className="flex items-center gap-2">
+                  <GraduationCap className="h-3.5 w-3.5" />
+                  <span>Thought Examples</span>
+                </div>
+              </Command.Item>
+              <Command.Item
+                onSelect={() => runCommand(() => router.push('/agents/planner-examples'))}
+                className="flex cursor-pointer items-center justify-between gap-2 rounded-md px-2 py-1.5 text-[13px] hover:bg-accent/10 aria-selected:bg-accent/10"
+              >
+                <div className="flex items-center gap-2">
+                  <ListChecks className="h-3.5 w-3.5" />
+                  <span>Planner Examples</span>
                 </div>
               </Command.Item>
             </Command.Group>

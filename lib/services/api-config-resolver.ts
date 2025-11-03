@@ -138,7 +138,8 @@ export function resolveProviderKey(
     } else if (provider === 'anthropic') {
       apiKey = process.env.ANTHROPIC_API_KEY || process.env.NEXT_PUBLIC_ANTHROPIC_API_KEY || null
     } else if (provider === 'openai') {
-      apiKey = process.env.OPENAI_API_KEY || process.env.NEXT_PUBLIC_OPENAI_API_KEY || null
+      apiKey = process.env.OPENAI_API_KEY || process.env.NEXT_PUBLIC_OPENAI_API_KEY || 
+               process.env.OPENAI_KEY || process.env.NEXT_PUBLIC_OPENAI_KEY || null
     } else if (provider === 'google') {
       apiKey = process.env.GOOGLE_API_KEY || process.env.NEXT_PUBLIC_GOOGLE_API_KEY || null
     }

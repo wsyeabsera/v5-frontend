@@ -19,10 +19,46 @@ const DEFAULT_AGENT_CONFIGS: AgentConfig[] = [
     agentId: 'complexity-detector',
     name: 'Complexity Detector',
     description: 'Analyzes query complexity using semantic matching and LLM reasoning',
-    modelId: '', // Empty until user configures
+    modelId: 'gpt-3.5-turbo',
     parameters: {
       temperature: 0.3,
       maxTokens: 500,
+      topP: 0.9,
+    },
+    enabled: true,
+  },
+  {
+    agentId: 'thought-agent',
+    name: 'Thought Agent',
+    description: 'Generate deep reasoning thoughts and explore multiple solution approaches',
+    modelId: 'gpt-3.5-turbo',
+    parameters: {
+      temperature: 0.7,
+      maxTokens: 1500,
+      topP: 0.9,
+    },
+    enabled: true,
+  },
+  {
+    agentId: 'planner-agent',
+    name: 'Planner Agent',
+    description: 'Convert reasoning thoughts into structured, executable action plans',
+    modelId: 'gpt-3.5-turbo',
+    parameters: {
+      temperature: 0.5,
+      maxTokens: 2000,
+      topP: 0.9,
+    },
+    enabled: true,
+  },
+  {
+    agentId: 'critic-agent',
+    name: 'Critic Agent',
+    description: 'Evaluate plans for errors, risks, and completeness before execution',
+    modelId: 'gpt-3.5-turbo',
+    parameters: {
+      temperature: 0.3,
+      maxTokens: 2000,
       topP: 0.9,
     },
     enabled: true,

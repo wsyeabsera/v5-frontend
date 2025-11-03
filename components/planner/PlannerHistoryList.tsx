@@ -4,19 +4,21 @@ import { PlannerAgentOutput } from '@/types'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Eye, Loader2, Frown, ListChecks } from 'lucide-react'
+import { Eye, Loader2, Frown, ListChecks, Download } from 'lucide-react'
 import Link from 'next/link'
 
 interface PlannerHistoryListProps {
   plans: PlannerAgentOutput[]
   isLoading: boolean
   onViewDetails?: (plan: PlannerAgentOutput) => void
+  onExportAsExample?: (plan: PlannerAgentOutput) => void
 }
 
 export function PlannerHistoryList({
   plans,
   isLoading,
   onViewDetails,
+  onExportAsExample,
 }: PlannerHistoryListProps) {
   if (isLoading) {
     return (
@@ -89,6 +91,17 @@ export function PlannerHistoryList({
                       Request
                     </Button>
                   </Link>
+                  {onExportAsExample && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => onExportAsExample(plan)}
+                      className="gap-2"
+                    >
+                      <Download className="w-4 h-4" />
+                      Export as Example
+                    </Button>
+                  )}
                 </div>
               </div>
             </CardHeader>
