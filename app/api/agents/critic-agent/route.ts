@@ -1,10 +1,31 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { CriticAgent } from '@/lib/agents/critic-agent'
 import { getCriticOutputsStorage } from '@/lib/storage/critic-outputs-storage'
+import { getThoughtOutputsStorage } from '@/lib/storage/thought-outputs-storage'
+import { getPlannerOutputsStorage } from '@/lib/storage/planner-outputs-storage'
 import { getAgentConfigStorage } from '@/lib/storage/agent-config-storage'
 import { getRequestMongoDBStorage } from '@/lib/storage/request-mongodb-storage'
-import { AgentConfig, RequestContext, Plan } from '@/types'
+import { AgentConfig, RequestContext, Plan, FollowUpQuestion } from '@/types'
 import { logger } from '@/utils/logger'
+
+/**
+ * Format user feedback into context string for plan regeneration
+ */
+function formatFeedbackContext(
+  questions: FollowUpQuestion[], 
+  feedback: Array<{questionId: string, answer: string}>
+): string {
+  const answeredQuestions = questions
+    .filter(q => feedback.some(f => f.questionId === q.id))
+    .map(q => {
+      const answer = feedback.find(f => f.questionId === q.id)?.answer
+      return `${q.question} -> ${answer}`
+    })
+  
+  if (answeredQuestions.length === 0) return ''
+  
+  return `\n\n[User clarifications: ${answeredQuestions.join('; ')}]`
+}
 
 /**
  * API Route for Critic Agent
@@ -33,7 +54,7 @@ import { logger } from '@/utils/logger'
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
-    const { plan, userQuery, requestContext, userFeedback, agentId } = body
+    const { plan, userQuery, requestContext, userFeedback, refinedUserQuery, agentId } = body
 
     // Validate required fields
     if (!plan) {
@@ -86,17 +107,127 @@ export async function POST(req: NextRequest) {
     }
     await requestStorage.save(updatedRequestContext)
 
+    // If user provided a refined query or feedback, regenerate thoughts and plan first
+    let finalPlan = plan
+    if ((refinedUserQuery && refinedUserQuery.trim()) || (userFeedback && userFeedback.length > 0)) {
+      logger.info(`[Critic Agent API] Regenerating thoughts and plan with user input`, {
+        requestId: requestContext.requestId,
+        originalQuery: userQuery,
+        hasRefinedQuery: !!(refinedUserQuery && refinedUserQuery.trim()),
+        hasFeedback: !!(userFeedback && userFeedback.length > 0),
+      })
+
+      // Build the enhanced query from refined query and/or feedback
+      let enhancedQuery = userQuery
+      
+      // Add refined query if provided
+      if (refinedUserQuery && refinedUserQuery.trim()) {
+        enhancedQuery = refinedUserQuery.trim()
+      }
+      
+      // Add feedback context if questions were answered
+      if (userFeedback && userFeedback.length > 0) {
+        // Fetch previous critique to get the questions
+        const criticStorage = getCriticOutputsStorage()
+        const previousCritique = await criticStorage.getByRequestId(requestContext.requestId)
+        
+        if (previousCritique && previousCritique.critique.followUpQuestions) {
+          const feedbackContext = formatFeedbackContext(
+            previousCritique.critique.followUpQuestions,
+            userFeedback
+          )
+          enhancedQuery += feedbackContext
+          
+          logger.info(`[Critic Agent API] Added feedback context to query`, {
+            requestId: requestContext.requestId,
+            feedbackLength: feedbackContext.length,
+            enhancedQueryLength: enhancedQuery.length,
+          })
+        } else {
+          logger.warn(`[Critic Agent API] Could not fetch previous critique for feedback context`, {
+            requestId: requestContext.requestId,
+          })
+        }
+      }
+      
+      logger.debug(`[Critic Agent API] Enhanced query for regeneration`, {
+        requestId: requestContext.requestId,
+        originalLength: userQuery.length,
+        enhancedLength: enhancedQuery.length,
+        hasRefinedQuery: !!(refinedUserQuery && refinedUserQuery.trim()),
+        hasFeedbackContext: enhancedQuery !== userQuery,
+      })
+      
+      // Fetch original thought output
+      const thoughtStorage = getThoughtOutputsStorage()
+      const thoughtOutput = await thoughtStorage.getByRequestId(requestContext.requestId)
+      
+      if (thoughtOutput && thoughtOutput.thoughts) {
+        // Regenerate thoughts with enhanced query
+        const ThoughtAgent = (await import('@/lib/agents/thought-agent')).ThoughtAgent
+        const thoughtAgent = new ThoughtAgent()
+        await thoughtAgent.initialize(req.headers)
+        
+        const updatedThoughts = await thoughtAgent.generateThought(
+          enhancedQuery,
+          updatedRequestContext,
+          {
+            complexityScore: thoughtOutput.complexityScore,
+            reasoningPasses: thoughtOutput.totalPasses,
+          }
+        )
+        
+        // Regenerate plan with updated thoughts
+        const PlannerAgent = (await import('@/lib/agents/planner-agent')).PlannerAgent
+        const plannerAgent = new PlannerAgent()
+        await plannerAgent.initialize(req.headers)
+        
+        // Determine next plan version
+        const plannerStorage = getPlannerOutputsStorage()
+        const existingPlans = await plannerStorage.getAllPlansByRequestId(requestContext.requestId)
+        const nextPlanVersion = existingPlans.length > 0 
+          ? Math.max(...existingPlans.map(p => p.plan?.planVersion || 1)) + 1
+          : 1
+        
+        const updatedPlanOutput = await plannerAgent.generatePlan(
+          updatedThoughts.thoughts,
+          enhancedQuery,
+          updatedRequestContext
+        )
+        
+        // Set plan version and save
+        if (updatedPlanOutput.plan) {
+          updatedPlanOutput.plan.planVersion = nextPlanVersion
+        }
+        
+        try {
+          await plannerStorage.save(updatedPlanOutput)
+          logger.info(`[Critic Agent API] New plan saved with version ${nextPlanVersion}`)
+        } catch (error: any) {
+          logger.error(`[Critic Agent API] Failed to save new plan:`, error.message)
+        }
+        
+        finalPlan = updatedPlanOutput.plan
+        logger.info(`[Critic Agent API] Plan regenerated with user input`, {
+          requestId: requestContext.requestId,
+          newStepsCount: finalPlan.steps.length,
+          planVersion: nextPlanVersion,
+        })
+      }
+    }
+
     // Generate critique
     logger.info(`[Critic Agent API] Generating critique`, {
       requestId: requestContext.requestId,
-      planId: plan.id,
-      stepsCount: plan.steps?.length || 0,
+      planId: finalPlan.id,
+      stepsCount: finalPlan.steps?.length || 0,
       hasUserFeedback: !!userFeedback,
+      hasRefinedQuery: !!refinedUserQuery,
     })
 
     const result = await agent.critiquePlan(
-      plan,
-      userQuery,
+      finalPlan,
+      refinedUserQuery?.trim() || userQuery,
       updatedRequestContext,
       userFeedback
     )
@@ -104,7 +235,19 @@ export async function POST(req: NextRequest) {
     // Store output in MongoDB
     try {
       const outputsStorage = getCriticOutputsStorage()
+      
+      // Determine version number
+      const existingCritiques = await outputsStorage.getAllVersionsByRequestId(requestContext.requestId)
+      const nextVersion = existingCritiques.length > 0 
+        ? Math.max(...existingCritiques.map(c => c.critiqueVersion || 1)) + 1
+        : 1
+      
+      result.critiqueVersion = nextVersion
       await outputsStorage.save(result)
+      
+      logger.info(`[Critic Agent API] Saved critique version ${nextVersion}`, {
+        requestId: result.requestId,
+      })
     } catch (error: any) {
       logger.error(`[Critic Agent API] Failed to store output:`, error.message)
       // Don't fail the request if storage fails

@@ -85,11 +85,18 @@ export async function POST(req: NextRequest) {
     }
     await requestStorage.save(updatedRequestContext)
 
-    // Generate plan
+    // Determine plan version by checking existing plans
+    const outputsStorage = getPlannerOutputsStorage()
+    const existingPlans = await outputsStorage.getAllPlansByRequestId(requestContext.requestId)
+    const nextPlanVersion = existingPlans.length > 0 
+      ? Math.max(...existingPlans.map(p => p.plan?.planVersion || 1)) + 1
+      : 1
+
     logger.info(`[Planner Agent API] Generating plan`, {
       requestId: requestContext.requestId,
       thoughtsCount: thoughts.length,
       queryLength: userQuery.length,
+      planVersion: nextPlanVersion,
     })
 
     const result = await agent.generatePlan(
@@ -97,6 +104,11 @@ export async function POST(req: NextRequest) {
       userQuery,
       updatedRequestContext
     )
+
+    // Set plan version after generation
+    if (result.plan) {
+      result.plan.planVersion = nextPlanVersion
+    }
 
     // Store output in MongoDB
     try {

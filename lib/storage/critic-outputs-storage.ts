@@ -20,6 +20,7 @@ async function ensureIndexes(): Promise<void> {
     await collection.createIndex({ requestId: 1 })
     await collection.createIndex({ agentName: 1 })
     await collection.createIndex({ timestamp: -1 }) // Descending for newest first
+    await collection.createIndex({ critiqueVersion: -1 }) // For sorting by version
     await collection.createIndex({ 'critique.recommendation': 1 }) // For filtering by recommendation
     await collection.createIndex({ 'critique.overallScore': -1 }) // For sorting by score
     
@@ -56,6 +57,7 @@ export class CriticOutputsStorage {
       timestamp: output.timestamp instanceof Date ? output.timestamp : new Date(output.timestamp),
       planId: output.planId,
       requiresUserFeedback: output.requiresUserFeedback,
+      critiqueVersion: output.critiqueVersion || 1,
       critique: {
         ...output.critique,
         // Ensure all arrays and nested objects are properly stored
@@ -84,21 +86,21 @@ export class CriticOutputsStorage {
       }
     }
 
-    // Upsert by requestId and agentName (one output per request)
-    await collection.updateOne(
-      { requestId: output.requestId, agentName: output.agentName },
-      { $set: doc },
-      { upsert: true }
-    )
+    // Insert as new version (allow multiple critiques per request)
+    await collection.insertOne(doc)
   }
 
   /**
-   * Get an output by request ID
+   * Get an output by request ID (returns latest version)
    */
   async getByRequestId(requestId: string): Promise<CriticAgentOutput | null> {
     const collection = await getCollection<CriticAgentOutput>(COLLECTION_NAME)
 
-    const result = await collection.findOne({ requestId, agentName: 'critic-agent' })
+    // Get latest version for this request
+    const result = await collection.findOne(
+      { requestId, agentName: 'critic-agent' },
+      { sort: { critiqueVersion: -1 } }
+    )
 
     if (!result) {
       return null
@@ -239,6 +241,37 @@ export class CriticOutputsStorage {
   async count(): Promise<number> {
     const collection = await getCollection(COLLECTION_NAME)
     return collection.countDocuments({ agentName: 'critic-agent' })
+  }
+
+  /**
+   * Get all critique versions for a request
+   */
+  async getAllVersionsByRequestId(requestId: string): Promise<CriticAgentOutput[]> {
+    const collection = await getCollection<CriticAgentOutput>(COLLECTION_NAME)
+
+    const results = await collection
+      .find({ requestId, agentName: 'critic-agent' })
+      .sort({ critiqueVersion: 1 }) // Ascending order
+      .toArray()
+
+    // Ensure timestamps are Dates
+    return results.map(result => ({
+      ...result,
+      timestamp: result.timestamp instanceof Date ? result.timestamp : new Date(result.timestamp),
+      critique: {
+        ...result.critique,
+        issues: result.critique.issues || [],
+        followUpQuestions: result.critique.followUpQuestions || [],
+        strengths: result.critique.strengths || [],
+        suggestions: result.critique.suggestions || [],
+      },
+      requestContext: result.requestContext ? {
+        ...result.requestContext,
+        createdAt: result.requestContext.createdAt instanceof Date 
+          ? result.requestContext.createdAt 
+          : new Date(result.requestContext.createdAt),
+      } : undefined,
+    } as CriticAgentOutput))
   }
 
   /**

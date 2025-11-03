@@ -95,21 +95,83 @@ export class PlannerOutputsStorage {
       }
     }
 
-    // Upsert by requestId and agentName (one output per request)
-    await collection.updateOne(
-      { requestId: output.requestId, agentName: output.agentName },
-      { $set: doc },
-      { upsert: true }
-    )
+    // Insert as new document to support multiple plans per requestId
+    await collection.insertOne(doc)
   }
 
   /**
-   * Get an output by request ID
+   * Get the latest output by request ID
    */
   async getByRequestId(requestId: string): Promise<PlannerAgentOutput | null> {
     const collection = await getCollection<PlannerAgentOutput>(COLLECTION_NAME)
 
-    const result = await collection.findOne({ requestId, agentName: 'planner-agent' })
+    const result = await collection.findOne(
+      { requestId, agentName: 'planner-agent' },
+      { sort: { timestamp: -1 } }
+    )
+
+    if (!result) {
+      return null
+    }
+
+    // Ensure timestamps are Dates
+    return {
+      ...result,
+      timestamp: result.timestamp instanceof Date ? result.timestamp : new Date(result.timestamp),
+      plan: {
+        ...result.plan,
+        createdAt: result.plan.createdAt instanceof Date 
+          ? result.plan.createdAt 
+          : new Date(result.plan.createdAt),
+        steps: result.plan.steps.map(step => ({ ...step })),
+      },
+      requestContext: result.requestContext ? {
+        ...result.requestContext,
+        createdAt: result.requestContext.createdAt instanceof Date 
+          ? result.requestContext.createdAt 
+          : new Date(result.requestContext.createdAt),
+      } : undefined,
+    } as PlannerAgentOutput
+  }
+
+  /**
+   * Get all plans by request ID, sorted by timestamp descending (newest first)
+   */
+  async getAllPlansByRequestId(requestId: string): Promise<PlannerAgentOutput[]> {
+    const collection = await getCollection<PlannerAgentOutput>(COLLECTION_NAME)
+
+    const results = await collection
+      .find({ requestId, agentName: 'planner-agent' })
+      .sort({ timestamp: -1 })
+      .toArray()
+
+    // Ensure timestamps are Dates
+    return results.map(result => ({
+      ...result,
+      timestamp: result.timestamp instanceof Date ? result.timestamp : new Date(result.timestamp),
+      plan: {
+        ...result.plan,
+        createdAt: result.plan.createdAt instanceof Date 
+          ? result.plan.createdAt 
+          : new Date(result.plan.createdAt),
+        steps: result.plan.steps.map(step => ({ ...step })),
+      },
+      requestContext: result.requestContext ? {
+        ...result.requestContext,
+        createdAt: result.requestContext.createdAt instanceof Date 
+          ? result.requestContext.createdAt 
+          : new Date(result.requestContext.createdAt),
+      } : undefined,
+    } as PlannerAgentOutput))
+  }
+
+  /**
+   * Get a specific plan by its ID
+   */
+  async getByPlanId(planId: string): Promise<PlannerAgentOutput | null> {
+    const collection = await getCollection<PlannerAgentOutput>(COLLECTION_NAME)
+
+    const result = await collection.findOne({ 'plan.id': planId })
 
     if (!result) {
       return null

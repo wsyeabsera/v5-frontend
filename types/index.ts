@@ -348,6 +348,7 @@ export interface Plan {
   confidence: number; // 0-1
   dependencies: string[]; // Overall plan dependencies
   createdAt: Date;
+  planVersion?: number; // Version number for tracking multiple plans per request
 }
 
 /**
@@ -431,6 +432,14 @@ export interface CriticAgentOutput extends AgentOutput {
   critique: Critique;
   planId: string; // ID of the plan being critiqued
   requiresUserFeedback: boolean; // Whether user input is needed to proceed
+  critiqueVersion?: number; // Version number for tracking critique evolution
+  validationWarnings?: Array<{
+    stepOrder: number
+    stepId: string
+    tool: string
+    missingParam: string
+    isRequired: boolean
+  }>
 }
 
 /**

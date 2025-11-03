@@ -113,6 +113,35 @@ Example of CORRECT JSON response:
   "rationale": "Plan is mostly sound but needs clarification on time range before execution"
 }
 
+FOLLOW-UP QUESTION GUIDELINES:
+
+ONLY generate questions when:
+- A tool parameter is required but has no value or uses placeholder
+- User intent is genuinely ambiguous (not just unspecified optional params)
+- Missing information would cause execution failure
+- A constraint or filter is critical for correctness
+
+DO NOT ask questions for:
+- Optional parameters with reasonable defaults
+- Information that can be inferred from context
+- Overly broad "nice to have" clarifications
+- Generic questions that don't help execution
+
+GOOD QUESTIONS (specific, actionable):
+- "Which facility ID should be analyzed? (e.g., 'FAC-001')"
+- "Should the analysis include historical data? If yes, from which date?"
+- "What contamination threshold level triggers an alert?"
+
+BAD QUESTIONS (generic, vague):
+- "What specific metrics are required?" (too broad)
+- "Do you want detailed analysis?" (unclear what "detailed" means)
+- "Any additional preferences?" (fishing for information)
+
+For each question:
+1. State WHAT information is needed
+2. Explain WHY it's needed (which step requires it)
+3. Provide EXAMPLES of valid answers when possible
+
 Remember: You are outputting JSON only, no text before or after the JSON object.`
 
   // Thresholds for recommendations
@@ -161,8 +190,15 @@ Remember: You are outputting JSON only, no text before or after the JSON object.
 
     // Add MCP tools context (critical for feasibility checks)
     if (mcpContext.tools.length > 0) {
-      prompt += '## Available MCP Tools\n\n'
-      prompt += '⚠️ CRITICAL: Verify that all tools referenced in the plan actually exist below.\n\n'
+      prompt += '## ⚠️ AVAILABLE MCP TOOLS (CRITICAL - VALIDATE AGAINST THIS LIST)\n\n'
+      prompt += `There are EXACTLY ${mcpContext.tools.length} tools available. Any tool not in this list is INVALID.\n\n`
+      
+      prompt += '**Available Tool Names:**\n'
+      prompt += mcpContext.tools.map(t => `- ${t.name}`).join('\n')
+      prompt += '\n\n'
+      
+      // Then show detailed schemas
+      prompt += '**Tool Details:**\n\n'
       
       for (const tool of mcpContext.tools) {
         prompt += `**${tool.name}**\n`
@@ -215,13 +251,41 @@ Remember: You are outputting JSON only, no text before or after the JSON object.
     // Step 2: Fetch MCP context
     const mcpContext = await this.fetchMCPContext()
 
-    // Step 3: Build enhanced system prompt
+    // Step 3: Validate plan parameters
+    const validation = this.validatePlanParameters(plan, mcpContext)
+    
+    if (validation.missingParams.length > 0) {
+      logger.info(`[CriticAgent] Found ${validation.missingParams.length} missing parameters`, {
+        requestId: updatedContext.requestId,
+        missingParams: validation.missingParams.map(m => ({
+          step: m.stepOrder,
+          tool: m.tool,
+          param: m.missingParam
+        }))
+      })
+    }
+
+    // Step 3.5: Validate tool availability
+    const toolValidation = this.validateToolAvailability(plan, mcpContext)
+    
+    const unavailableTools = toolValidation.filter(v => !v.available)
+    if (unavailableTools.length > 0) {
+      logger.info(`[CriticAgent] Found ${unavailableTools.length} unavailable tools`, {
+        requestId: updatedContext.requestId,
+        unavailableTools: unavailableTools.map(t => ({
+          step: t.stepOrder,
+          tool: t.tool
+        }))
+      })
+    }
+
+    // Step 4: Build enhanced system prompt
     const enhancedSystemPrompt = this.buildEnhancedSystemPrompt(mcpContext)
 
-    // Step 4: Build the prompt for the LLM
-    const prompt = this.buildCritiquePrompt(plan, userQuery, mcpContext, userFeedback)
+    // Step 5: Build the prompt for the LLM
+    const prompt = this.buildCritiquePrompt(plan, userQuery, mcpContext, userFeedback, validation, toolValidation)
 
-    // Step 5: Call LLM
+    // Step 6: Call LLM
     const messages = [
       { role: 'system' as const, content: enhancedSystemPrompt },
       { role: 'user' as const, content: prompt },
@@ -240,10 +304,10 @@ Remember: You are outputting JSON only, no text before or after the JSON object.
       responseFormat: { type: 'json_object' } // Force JSON output
     })
 
-    // Step 6: Parse the structured response
+    // Step 7: Parse the structured response
     const critique = this.parseCritiqueResponse(response, plan.id, userFeedback)
 
-    // Step 7: Build output with Request ID
+    // Step 8: Build output with Request ID
     const output: CriticAgentOutput = {
       // Agent output base
       requestId: updatedContext.requestId,
@@ -255,6 +319,7 @@ Remember: You are outputting JSON only, no text before or after the JSON object.
       critique,
       planId: plan.id,
       requiresUserFeedback: critique.followUpQuestions.some(q => !q.userAnswer),
+      validationWarnings: validation.missingParams,
     }
 
     logger.info(`[CriticAgent] Plan critiqued`, {
@@ -282,9 +347,39 @@ Remember: You are outputting JSON only, no text before or after the JSON object.
     plan: Plan,
     userQuery: string,
     mcpContext: MCPContext,
-    userFeedback?: { questionId: string; answer: string }[]
+    userFeedback?: { questionId: string; answer: string }[],
+    validation?: { missingParams: Array<{ stepId: string; stepOrder: number; tool: string; missingParam: string; isRequired: boolean }> },
+    toolValidation?: Array<{ stepOrder: number; stepId: string; tool: string; available: boolean }>
   ): string {
     let prompt = `User Query: "${userQuery}"\n\n`
+
+    // Add validation results if available
+    if (validation && validation.missingParams.length > 0) {
+      prompt += `⚠️ MISSING REQUIRED PARAMETERS:\n`
+      for (const missing of validation.missingParams) {
+        prompt += `- Step ${missing.stepOrder} (${missing.stepId}): Tool '${missing.tool}' requires '${missing.missingParam}'\n`
+      }
+      prompt += `\nGenerate follow-up questions to collect these missing parameter values.\n`
+      prompt += `Ask SPECIFIC questions referencing the step number and parameter name.\n\n`
+    }
+
+    // Add tool availability validation results
+    if (toolValidation && toolValidation.length > 0) {
+      const unavailableTools = toolValidation.filter(v => !v.available)
+      
+      if (unavailableTools.length > 0) {
+        prompt += `\n\n## ⚠️ CRITICAL TOOL VALIDATION ERRORS\n\n`
+        prompt += `The following tools in the plan DO NOT EXIST in available MCP tools:\n\n`
+        
+        unavailableTools.forEach(v => {
+          prompt += `- Step ${v.stepOrder}: Tool "${v.tool}" is NOT AVAILABLE\n`
+        })
+        
+        prompt += `\nYou MUST flag these as CRITICAL feasibility issues.\n`
+      } else {
+        prompt += `\n\n✅ All tools in plan are available in MCP.\n`
+      }
+    }
 
     // Format plan for critique
     prompt += `Plan to Evaluate:\n`
@@ -315,6 +410,99 @@ Remember: You are outputting JSON only, no text before or after the JSON object.
     }
 
     return prompt
+  }
+
+  /**
+   * Validate plan parameters against available tool schemas
+   * 
+   * @param plan - Plan to validate
+   * @param mcpContext - MCP context with tool schemas
+   * @returns Missing parameter information
+   */
+  private validatePlanParameters(plan: Plan, mcpContext: MCPContext): {
+    missingParams: Array<{
+      stepId: string
+      stepOrder: number
+      tool: string
+      missingParam: string
+      isRequired: boolean
+    }>
+  } {
+    const missingParams: Array<{
+      stepId: string
+      stepOrder: number
+      tool: string
+      missingParam: string
+      isRequired: boolean
+    }> = []
+    
+    for (const step of plan.steps) {
+      const tool = mcpContext.tools.find(t => t.name === step.action)
+      if (!tool || !tool.inputSchema) continue
+      
+      const schema = tool.inputSchema
+      const required = schema.properties && typeof schema.properties === 'object'
+        ? Object.keys(schema.properties).filter(param => 
+            schema.required && schema.required.includes(param)
+          )
+        : []
+      
+      for (const param of required) {
+        // Check if parameter is missing or has placeholder value
+        const paramValue = step.parameters?.[param]
+        const isPlaceholder = typeof paramValue === 'string' && (
+          paramValue.toLowerCase().includes('example') ||
+          paramValue.toLowerCase().includes('placeholder') ||
+          paramValue.toLowerCase().includes('extracted_from') ||
+          paramValue.toLowerCase().includes('extracted_') ||
+          paramValue === '' ||
+          paramValue.trim() === ''
+        )
+        
+        if (!paramValue || isPlaceholder) {
+          missingParams.push({
+            stepId: step.id,
+            stepOrder: step.order,
+            tool: step.action,
+            missingParam: param,
+            isRequired: true
+          })
+        }
+      }
+    }
+    
+    return { missingParams }
+  }
+
+  /**
+   * Validate that tools in plan exist in MCP
+   */
+  private validateToolAvailability(
+    plan: Plan,
+    mcpContext: MCPContext
+  ): Array<{ stepOrder: number; stepId: string; tool: string; available: boolean }> {
+    const toolMap = new Map(mcpContext.tools.map(t => [t.name, t]))
+    const validation: Array<{ stepOrder: number; stepId: string; tool: string; available: boolean }> = []
+    
+    for (const step of plan.steps) {
+      // Skip validation for manual/review actions
+      if (step.action.toLowerCase().includes('manual') || 
+          step.action.toLowerCase().includes('review') ||
+          step.action === 'unknown') {
+        continue
+      }
+      
+      const toolExists = toolMap.has(step.action)
+      
+      validation.push({
+        stepOrder: step.order,
+        stepId: step.id,
+        tool: step.action,
+        available: toolExists,
+      })
+    }
+    
+    return validation
   }
 
   /**

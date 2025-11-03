@@ -18,6 +18,10 @@ import remarkGfm from 'remark-gfm'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { Textarea } from '@/components/ui/textarea'
+import { ValidationWarnings } from './components/ValidationWarnings'
+import { QuestionMetrics } from './components/QuestionMetrics'
+import { PlanComparison } from './components/PlanComparison'
+import { VersionHistory } from './components/VersionHistory'
 
 function CriticAgentContent() {
   const searchParams = useSearchParams()
@@ -32,7 +36,11 @@ function CriticAgentContent() {
   const [selectedAgentId, setSelectedAgentId] = useState<string>('')
   const [configOpen, setConfigOpen] = useState(false)
   const [userFeedback, setUserFeedback] = useState<{ questionId: string; answer: string }[]>([])
+  const [refinedUserQuery, setRefinedUserQuery] = useState<string>('')
   const [submittingFeedback, setSubmittingFeedback] = useState(false)
+  const [critiqueVersions, setCritiqueVersions] = useState<CriticAgentOutput[]>([])
+  const [originalPlan, setOriginalPlan] = useState<Plan | null>(null)
+  const [showPlanComparison, setShowPlanComparison] = useState(false)
   
   const { data: agentConfigsData } = useAgentConfigs()
   const { data: modelsData } = useModels()
@@ -105,12 +113,27 @@ function CriticAgentContent() {
     localStorage.setItem('critic-agent-config-open', JSON.stringify(configOpen))
   }, [configOpen])
 
+  const fetchVersionHistory = async (requestId: string) => {
+    try {
+      const response = await fetch(`/api/agents/critic-agent/versions/${requestId}`)
+      if (response.ok) {
+        const versions = await response.json()
+        setCritiqueVersions(versions)
+      }
+    } catch (err) {
+      console.error('Failed to fetch version history:', err)
+    }
+  }
+
   const handleRequestSelect = async (request: RequestContext & { critiqueOutputExists: boolean }) => {
     setSelectedRequestId(request.requestId)
     setLoading(true)
     setError(null)
     setResult(null)
     setUserFeedback([])
+    setRefinedUserQuery('')
+    setOriginalPlan(null)
+    setShowPlanComparison(false)
 
     if (!selectedAgentId || !selectedConfig) {
       setError('Please select an agent configuration')
@@ -152,6 +175,9 @@ function CriticAgentContent() {
       const data = await response.json()
       setResult(data)
       
+      // Fetch version history
+      fetchVersionHistory(request.requestId)
+      
       // Update the request's critique output status
       setRequests(prev => prev.map(r => 
         r.requestId === request.requestId 
@@ -190,6 +216,7 @@ function CriticAgentContent() {
           userQuery: result.requestContext.userQuery || plannerData.plan.goal || 'No user query available',
           requestContext: result.requestContext,
           userFeedback,
+          refinedUserQuery: refinedUserQuery.trim() || undefined,
           agentId: selectedAgentId,
         }),
       })
@@ -202,6 +229,11 @@ function CriticAgentContent() {
       const data = await response.json()
       setResult(data)
       setUserFeedback([])
+      setRefinedUserQuery('')
+      setOriginalPlan(null)
+      
+      // Fetch updated version history
+      fetchVersionHistory(result.requestId)
     } catch (err: any) {
       setError(err.message || 'An error occurred')
     } finally {
@@ -463,7 +495,10 @@ function CriticAgentContent() {
                 </CardContent>
               </Card>
             ) : result ? (
-              <CritiqueResultsDisplay result={result} userFeedback={userFeedback} updateFeedback={updateFeedback} onSubmitFeedback={handleSubmitFeedback} submittingFeedback={submittingFeedback} />
+              <>
+                <VersionHistory versions={critiqueVersions} currentVersionId={result.critiqueVersion?.toString() || '1'} />
+                <CritiqueResultsDisplay result={result} userFeedback={userFeedback} updateFeedback={updateFeedback} onSubmitFeedback={handleSubmitFeedback} submittingFeedback={submittingFeedback} refinedUserQuery={refinedUserQuery} setRefinedUserQuery={setRefinedUserQuery} />
+              </>
             ) : (
               <Card>
                 <CardContent className="pt-6">
@@ -487,13 +522,17 @@ function CritiqueResultsDisplay({
   userFeedback, 
   updateFeedback, 
   onSubmitFeedback, 
-  submittingFeedback 
+  submittingFeedback,
+  refinedUserQuery,
+  setRefinedUserQuery
 }: { 
   result: CriticAgentOutput
   userFeedback: { questionId: string; answer: string }[]
   updateFeedback: (questionId: string, answer: string) => void
   onSubmitFeedback: () => void
   submittingFeedback: boolean
+  refinedUserQuery: string
+  setRefinedUserQuery: (query: string) => void
 }) {
   const { critique } = result
   
@@ -612,6 +651,11 @@ function CritiqueResultsDisplay({
         </CardContent>
       </Card>
 
+      {/* Validation Warnings */}
+      {result.validationWarnings && result.validationWarnings.length > 0 && (
+        <ValidationWarnings warnings={result.validationWarnings} />
+      )}
+
       {/* Issues */}
       {critique.issues.length > 0 && (
         <Card>
@@ -665,6 +709,26 @@ function CritiqueResultsDisplay({
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
+            {/* Question Quality Metrics */}
+            <QuestionMetrics questions={critique.followUpQuestions} />
+            
+            {/* Query Refinement Section */}
+            <div className="space-y-2 p-4 bg-muted/50 rounded-lg border border-border/50">
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium">Refine Your Query (Optional)</span>
+                <Badge variant="secondary" className="text-xs">Optional</Badge>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                You can clarify or adjust your original request here
+              </p>
+              <Textarea
+                placeholder="Enter any additional context, constraints, or refinements to your original query..."
+                value={refinedUserQuery}
+                onChange={(e) => setRefinedUserQuery(e.target.value)}
+                rows={3}
+                className="text-sm"
+              />
+            </div>
             {critique.followUpQuestions.map((question) => (
               <div key={question.id} className="space-y-2">
                 <div className="flex items-start gap-2">
@@ -697,12 +761,12 @@ function CritiqueResultsDisplay({
                 {submittingFeedback ? (
                   <>
                     <Loader2 className="w-4 h-4 animate-spin" />
-                    Regenerating Critique...
+                    {refinedUserQuery ? 'Regenerating Plan...' : 'Regenerating Critique...'}
                   </>
                 ) : (
                   <>
                     <MessageSquare className="w-4 h-4" />
-                    Submit Feedback
+                    {refinedUserQuery ? 'Update Plan & Re-critique' : 'Submit Feedback'}
                   </>
                 )}
               </Button>
