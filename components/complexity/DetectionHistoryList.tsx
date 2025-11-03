@@ -69,6 +69,11 @@ export function DetectionHistoryList({
                 </div>
               </div>
               <div className="flex items-center gap-2">
+                <Link href={`/agents/complexity-detector/${detection.requestId}`}>
+                  <Button variant="default" size="sm" className="gap-2">
+                    Open
+                  </Button>
+                </Link>
                 {onViewDetails && (
                   <Button
                     variant="ghost"
@@ -77,7 +82,7 @@ export function DetectionHistoryList({
                     className="gap-2"
                   >
                     <Eye className="w-4 h-4" />
-                    View
+                    Quick View
                   </Button>
                 )}
                 <Link href={`/requests?search=${detection.requestId}`}>

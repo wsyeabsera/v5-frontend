@@ -133,7 +133,7 @@ export function RequestDetailModal({
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <AgentChainView agentChain={request.agentChain} />
+              <AgentChainView agentChain={request.agentChain} requestId={request.requestId} />
             </CardContent>
           </Card>
 

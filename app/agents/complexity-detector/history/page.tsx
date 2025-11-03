@@ -11,6 +11,7 @@ import {
 } from '@/components/complexity/DetectionHistoryFilters'
 import { ArrowLeft, RefreshCw, History, Trash2 } from 'lucide-react'
 import { DeleteAllDialog } from '@/components/ui/delete-all-dialog'
+import { Breadcrumbs } from '@/components/ui/breadcrumbs'
 import Link from 'next/link'
 import {
   Dialog,
@@ -114,6 +115,11 @@ export default function ComplexityDetectorHistoryPage() {
   return (
     <div className="min-h-screen p-6">
       <div className="max-w-6xl mx-auto space-y-6">
+        <Breadcrumbs items={[
+          { label: 'Agent Pipeline', href: '/agents/pipeline' },
+          { label: 'Complexity Detector', href: '/agents/complexity-detector' },
+          { label: 'History' },
+        ]} />
         {/* Header */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">

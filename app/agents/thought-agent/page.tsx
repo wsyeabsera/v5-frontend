@@ -1,19 +1,27 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { ThoughtAgentOutput, AgentConfig, RequestContext } from '@/types'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
+import { Breadcrumbs } from '@/components/ui/breadcrumbs'
+import { PipelineBanner } from '@/components/agents/PipelineBanner'
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { getRequestsWithComplexityDetector } from '@/lib/api/requests-api'
 import { useStore } from '@/lib/store'
 import { useAgentConfigs, useModels } from '@/lib/queries'
-import { Sparkles, Loader2, Settings, Check, Brain, Target, AlertCircle, Wrench, Lightbulb, Clock } from 'lucide-react'
+import { Sparkles, Loader2, Settings, Check, Brain, Target, AlertCircle, Wrench, Lightbulb, Clock, ChevronDown, Inbox, History } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
+import { useSearchParams } from 'next/navigation'
+import Link from 'next/link'
 
-export default function ThoughtAgentPage() {
+function ThoughtAgentContent() {
+  const searchParams = useSearchParams()
+  const urlRequestId = searchParams.get('requestId')
+  
   const [requests, setRequests] = useState<(RequestContext & { thoughtOutputExists: boolean })[]>([])
   const [loadingRequests, setLoadingRequests] = useState(true)
   const [loading, setLoading] = useState(false)
@@ -21,6 +29,7 @@ export default function ThoughtAgentPage() {
   const [error, setError] = useState<string | null>(null)
   const [selectedRequestId, setSelectedRequestId] = useState<string | null>(null)
   const [selectedAgentId, setSelectedAgentId] = useState<string>('')
+  const [configOpen, setConfigOpen] = useState(false)
   
   const { data: agentConfigsData } = useAgentConfigs()
   const { data: modelsData } = useModels()
@@ -44,6 +53,16 @@ export default function ThoughtAgentPage() {
   useEffect(() => {
     loadRequests()
   }, [])
+
+  // Auto-select request from URL if present
+  useEffect(() => {
+    if (urlRequestId && requests.length > 0) {
+      const request = requests.find(r => r.requestId === urlRequestId)
+      if (request) {
+        handleRequestSelect(request)
+      }
+    }
+  }, [urlRequestId, requests])
 
   const loadRequests = async () => {
     setLoadingRequests(true)
@@ -69,6 +88,19 @@ export default function ThoughtAgentPage() {
 
   // Get model test results for badge display
   const { modelTestResults } = useStore()
+
+  // Load config open state from localStorage
+  useEffect(() => {
+    const saved = localStorage.getItem('thought-agent-config-open')
+    if (saved !== null) {
+      setConfigOpen(JSON.parse(saved))
+    }
+  }, [])
+
+  // Save config open state to localStorage
+  useEffect(() => {
+    localStorage.setItem('thought-agent-config-open', JSON.stringify(configOpen))
+  }, [configOpen])
 
   const handleRequestSelect = async (request: RequestContext & { thoughtOutputExists: boolean }) => {
     if (!selectedAgentId || !selectedConfig) {
@@ -117,204 +149,248 @@ export default function ThoughtAgentPage() {
 
   return (
     <div className="min-h-screen p-6">
-      <div className="max-w-6xl mx-auto space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold mb-1">Thought Agent</h1>
-          <p className="text-[13px] text-muted-foreground">
-            Generate deep reasoning thoughts and explore multiple solution approaches
-          </p>
+      <div className="max-w-7xl mx-auto space-y-6">
+        <Breadcrumbs items={[
+          { label: 'Agent Pipeline', href: '/agents/pipeline' },
+          { label: 'Thought Agent' },
+        ]} />
+        <PipelineBanner currentAgent="thought-agent" />
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold mb-1">Thought Agent</h1>
+            <p className="text-[13px] text-muted-foreground">
+              Generate deep reasoning thoughts and explore multiple solution approaches
+            </p>
+          </div>
+          <Link href="/agents/thought-agent/history">
+            <Button variant="outline" size="sm" className="gap-2">
+              <History className="w-4 h-4" />
+              View History
+            </Button>
+          </Link>
         </div>
 
-        {/* Agent Config Selector */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Settings className="w-5 h-5" />
-              Agent Configuration
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <label htmlFor="agentConfig" className="text-sm font-medium">Select Agent Configuration</label>
-              <Select
-                value={selectedAgentId}
-                onValueChange={setSelectedAgentId}
-                disabled={loading || enabledConfigs.length === 0}
-              >
-                <SelectTrigger id="agentConfig">
-                  <SelectValue placeholder="Select an agent configuration">
-                    {selectedConfig && (
+        {/* Split-screen Layout */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Left Column: Form */}
+          <div className="space-y-6">
+            {/* Agent Config Selector - Collapsible */}
+            <Collapsible open={configOpen} onOpenChange={setConfigOpen}>
+              <Card>
+                <CollapsibleTrigger asChild>
+                  <CardHeader className="cursor-pointer hover:bg-muted/50 transition-colors">
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="flex items-center gap-2">
+                        <Settings className="w-5 h-5" />
+                        Agent Configuration
+                      </CardTitle>
                       <div className="flex items-center gap-2">
-                        <span className="font-medium">{selectedConfig.name}</span>
-                        {selectedConfig.modelId && modelTestResults[selectedConfig.modelId]?.status === 'success' && (
-                          <Badge variant="outline" className="bg-green-500/10 text-green-600 dark:text-green-400 border-green-200 dark:border-green-900">
-                            <Check className="w-3 h-3 mr-1" />
-                            Verified
+                        {selectedConfig && (
+                          <Badge variant="outline" className="text-xs">
+                            {selectedConfig.name}
                           </Badge>
+                        )}
+                        <ChevronDown className={`w-4 h-4 transition-transform ${configOpen ? 'rotate-180' : ''}`} />
+                      </div>
+                    </div>
+                  </CardHeader>
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <CardContent className="space-y-4">
+                    <div className="space-y-2">
+                      <label htmlFor="agentConfig" className="text-sm font-medium">Select Agent Configuration</label>
+                      <Select
+                        value={selectedAgentId}
+                        onValueChange={setSelectedAgentId}
+                        disabled={loading || enabledConfigs.length === 0}
+                      >
+                        <SelectTrigger id="agentConfig">
+                          <SelectValue placeholder="Select an agent configuration">
+                            {selectedConfig && (
+                              <div className="flex items-center gap-2">
+                                <span className="font-medium">{selectedConfig.name}</span>
+                                {selectedConfig.modelId && modelTestResults[selectedConfig.modelId]?.status === 'success' && (
+                                  <Badge variant="outline" className="bg-green-500/10 text-green-600 dark:text-green-400 border-green-200 dark:border-green-900">
+                                    <Check className="w-3 h-3 mr-1" />
+                                    Verified
+                                  </Badge>
+                                )}
+                              </div>
+                            )}
+                          </SelectValue>
+                        </SelectTrigger>
+                        <SelectContent>
+                          {enabledConfigs.length === 0 ? (
+                            <div className="p-4 text-sm text-muted-foreground text-center">
+                              No enabled agent configurations available. Configure agents in Settings.
+                            </div>
+                          ) : (
+                            enabledConfigs.map((config: AgentConfig) => {
+                              const model = models.find((m: any) => m.id === config.modelId)
+                              const isTested = config.modelId ? modelTestResults[config.modelId]?.status === 'success' : false
+                              return (
+                                <SelectItem key={config.agentId} value={config.agentId}>
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-medium">{config.name}</span>
+                                    {isTested && (
+                                      <Badge variant="outline" className="bg-green-500/10 text-green-600 dark:text-green-400 border-green-200 dark:border-green-900 ml-auto">
+                                        <Check className="w-3 h-3 mr-1" />
+                                        Tested
+                                      </Badge>
+                                    )}
+                                    {model && (
+                                      <span className="text-xs text-muted-foreground">({model.provider})</span>
+                                    )}
+                                  </div>
+                                </SelectItem>
+                              )
+                            })
+                          )}
+                        </SelectContent>
+                      </Select>
+                      <p className="text-xs text-muted-foreground">
+                        Choose which agent configuration to use for thought generation. The selected config's model and parameters will be used for LLM calls.
+                      </p>
+                    </div>
+
+                    {/* Selected Config Details */}
+                    {selectedConfig && (
+                      <div className="p-4 rounded-lg bg-muted/50 border border-border/50 space-y-3">
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <h4 className="font-semibold text-sm mb-1">{selectedConfig.name}</h4>
+                            <p className="text-xs text-muted-foreground">{selectedConfig.description}</p>
+                          </div>
+                          <Badge variant={selectedConfig.enabled ? 'default' : 'secondary'}>
+                            {selectedConfig.enabled ? 'Enabled' : 'Disabled'}
+                          </Badge>
+                        </div>
+                        {selectedModel && (
+                          <div className="flex items-center gap-2 text-sm">
+                            <span className="text-muted-foreground">Model:</span>
+                            <span className="font-medium">{selectedModel.name}</span>
+                            <span className="text-xs text-muted-foreground">({selectedModel.provider})</span>
+                          </div>
+                        )}
+                        {selectedConfig.parameters && (
+                          <div className="grid grid-cols-3 gap-2 text-xs pt-2 border-t border-border/40">
+                            <div>
+                              <span className="text-muted-foreground">Temperature:</span>
+                              <span className="ml-1 font-mono">{selectedConfig.parameters.temperature?.toFixed(2) || '0.30'}</span>
+                            </div>
+                            <div>
+                              <span className="text-muted-foreground">Max Tokens:</span>
+                              <span className="ml-1 font-mono">{selectedConfig.parameters.maxTokens || 500}</span>
+                            </div>
+                            <div>
+                              <span className="text-muted-foreground">Top P:</span>
+                              <span className="ml-1 font-mono">{selectedConfig.parameters.topP?.toFixed(2) || '0.90'}</span>
+                            </div>
+                          </div>
                         )}
                       </div>
                     )}
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  {enabledConfigs.length === 0 ? (
-                    <div className="p-4 text-sm text-muted-foreground text-center">
-                      No enabled agent configurations available. Configure agents in Settings.
-                    </div>
-                  ) : (
-                    enabledConfigs.map((config: AgentConfig) => {
-                      const model = models.find((m: any) => m.id === config.modelId)
-                      const isTested = config.modelId ? modelTestResults[config.modelId]?.status === 'success' : false
-                      return (
-                        <SelectItem key={config.agentId} value={config.agentId}>
-                          <div className="flex items-center gap-2">
-                            <span className="font-medium">{config.name}</span>
-                            {isTested && (
-                              <Badge variant="outline" className="bg-green-500/10 text-green-600 dark:text-green-400 border-green-200 dark:border-green-900 ml-auto">
-                                <Check className="w-3 h-3 mr-1" />
-                                Tested
-                              </Badge>
+                  </CardContent>
+                </CollapsibleContent>
+              </Card>
+            </Collapsible>
+
+            {/* Requests List */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Brain className="w-5 h-5" />
+                  Select a Request
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {loadingRequests ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+                    <span className="ml-2 text-sm text-muted-foreground">Loading requests...</span>
+                  </div>
+                ) : requests.length === 0 ? (
+                  <div className="text-center py-8 text-sm text-muted-foreground">
+                    No requests found with complexity-detector in the agent chain.
+                    <br />
+                    <span className="text-xs mt-1">Generate some requests in the Complexity Detector first.</span>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {requests.map((request) => (
+                      <div
+                        key={request.requestId}
+                        onClick={() => handleRequestSelect(request)}
+                        className={`p-4 rounded-lg border cursor-pointer transition-colors ${
+                          selectedRequestId === request.requestId
+                            ? 'border-primary bg-primary/5'
+                            : 'border-border hover:border-primary/50 hover:bg-muted/50'
+                        } ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                      >
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-2">
+                              <code className="text-xs font-mono bg-muted px-2 py-1 rounded">
+                                {request.requestId}
+                              </code>
+                              {request.thoughtOutputExists && (
+                                <Badge variant="outline" className="bg-green-500/10 text-green-600 dark:text-green-400 border-green-200 dark:border-green-900">
+                                  <Check className="w-3 h-3 mr-1" />
+                                  Has Thoughts
+                                </Badge>
+                              )}
+                            </div>
+                            {request.userQuery && (
+                              <p className="text-sm text-muted-foreground mb-2 line-clamp-2">
+                                {request.userQuery}
+                              </p>
                             )}
-                            {model && (
-                              <span className="text-xs text-muted-foreground">({model.provider})</span>
-                            )}
+                            <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                              <div className="flex items-center gap-1">
+                                <Clock className="w-3 h-3" />
+                                {new Date(request.createdAt).toLocaleString()}
+                              </div>
+                              <div className="flex items-center gap-1">
+                                <span>Chain:</span>
+                                <Badge variant="secondary" className="text-xs">
+                                  {request.agentChain.join(' → ')}
+                                </Badge>
+                              </div>
+                            </div>
                           </div>
-                        </SelectItem>
-                      )
-                    })
-                  )}
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-muted-foreground">
-                Choose which agent configuration to use for thought generation. The selected config's model and parameters will be used for LLM calls.
-              </p>
-            </div>
-
-            {/* Selected Config Details */}
-            {selectedConfig && (
-              <div className="p-4 rounded-lg bg-muted/50 border border-border/50 space-y-3">
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <h4 className="font-semibold text-sm mb-1">{selectedConfig.name}</h4>
-                    <p className="text-xs text-muted-foreground">{selectedConfig.description}</p>
-                  </div>
-                  <Badge variant={selectedConfig.enabled ? 'default' : 'secondary'}>
-                    {selectedConfig.enabled ? 'Enabled' : 'Disabled'}
-                  </Badge>
-                </div>
-                {selectedModel && (
-                  <div className="flex items-center gap-2 text-sm">
-                    <span className="text-muted-foreground">Model:</span>
-                    <span className="font-medium">{selectedModel.name}</span>
-                    <span className="text-xs text-muted-foreground">({selectedModel.provider})</span>
-                  </div>
-                )}
-                {selectedConfig.parameters && (
-                  <div className="grid grid-cols-3 gap-2 text-xs pt-2 border-t border-border/40">
-                    <div>
-                      <span className="text-muted-foreground">Temperature:</span>
-                      <span className="ml-1 font-mono">{selectedConfig.parameters.temperature?.toFixed(2) || '0.30'}</span>
-                    </div>
-                    <div>
-                      <span className="text-muted-foreground">Max Tokens:</span>
-                      <span className="ml-1 font-mono">{selectedConfig.parameters.maxTokens || 500}</span>
-                    </div>
-                    <div>
-                      <span className="text-muted-foreground">Top P:</span>
-                      <span className="ml-1 font-mono">{selectedConfig.parameters.topP?.toFixed(2) || '0.90'}</span>
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Requests List */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Brain className="w-5 h-5" />
-              Select a Request
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {loadingRequests ? (
-              <div className="flex items-center justify-center py-8">
-                <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
-                <span className="ml-2 text-sm text-muted-foreground">Loading requests...</span>
-              </div>
-            ) : requests.length === 0 ? (
-              <div className="text-center py-8 text-sm text-muted-foreground">
-                No requests found with complexity-detector in the agent chain.
-                <br />
-                <span className="text-xs mt-1">Generate some requests in the Complexity Detector first.</span>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {requests.map((request) => (
-                  <div
-                    key={request.requestId}
-                    onClick={() => handleRequestSelect(request)}
-                    className={`p-4 rounded-lg border cursor-pointer transition-colors ${
-                      selectedRequestId === request.requestId
-                        ? 'border-primary bg-primary/5'
-                        : 'border-border hover:border-primary/50 hover:bg-muted/50'
-                    } ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
-                  >
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-2">
-                          <code className="text-xs font-mono bg-muted px-2 py-1 rounded">
-                            {request.requestId}
-                          </code>
-                          {request.thoughtOutputExists && (
-                            <Badge variant="outline" className="bg-green-500/10 text-green-600 dark:text-green-400 border-green-200 dark:border-green-900">
-                              <Check className="w-3 h-3 mr-1" />
-                              Has Thoughts
-                            </Badge>
+                          {selectedRequestId === request.requestId && loading && (
+                            <Loader2 className="w-5 h-5 animate-spin text-primary" />
                           )}
                         </div>
-                        {request.userQuery && (
-                          <p className="text-sm text-muted-foreground mb-2 line-clamp-2">
-                            {request.userQuery}
-                          </p>
-                        )}
-                        <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                          <div className="flex items-center gap-1">
-                            <Clock className="w-3 h-3" />
-                            {new Date(request.createdAt).toLocaleString()}
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <span>Chain:</span>
-                            <Badge variant="secondary" className="text-xs">
-                              {request.agentChain.join(' → ')}
-                            </Badge>
-                          </div>
-                        </div>
                       </div>
-                      {selectedRequestId === request.requestId && loading && (
-                        <Loader2 className="w-5 h-5 animate-spin text-primary" />
-                      )}
-                    </div>
+                    ))}
                   </div>
-                ))}
-              </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Error Display */}
+            {error && (
+              <Card className="border-destructive bg-destructive/10">
+                <CardContent className="pt-6">
+                  <p className="text-sm text-destructive">{error}</p>
+                </CardContent>
+              </Card>
             )}
-          </CardContent>
-        </Card>
+          </div>
 
-        {/* Error Display */}
-        {error && (
-          <Card className="border-destructive bg-destructive/10">
-            <CardContent className="pt-6">
-              <p className="text-sm text-destructive">{error}</p>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Results Display */}
-        {result && (
+          {/* Right Column: Results */}
+          <div className="space-y-6">
+            {loading ? (
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="flex items-center justify-center py-12">
+                    <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+                    <span className="ml-2 text-sm text-muted-foreground">Generating thoughts...</span>
+                  </div>
+                </CardContent>
+              </Card>
+            ) : result ? (
           <div className="space-y-6">
             {/* Request Info */}
             <Card>
@@ -545,8 +621,28 @@ export default function ThoughtAgentPage() {
               </Card>
             )}
           </div>
-        )}
+            ) : (
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="flex flex-col items-center justify-center py-12 text-center">
+                    <Inbox className="w-12 h-12 text-muted-foreground/50 mb-3" />
+                    <p className="text-sm font-medium text-muted-foreground mb-1">No Results Yet</p>
+                    <p className="text-xs text-muted-foreground">Select a request to generate thought analysis results</p>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        </div>
       </div>
     </div>
+  )
+}
+
+export default function ThoughtAgentPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen p-6"><div className="max-w-6xl mx-auto">Loading...</div></div>}>
+      <ThoughtAgentContent />
+    </Suspense>
   )
 }

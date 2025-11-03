@@ -71,6 +71,7 @@ export abstract class BaseAgent {
       temperature?: number
       maxTokens?: number
       topP?: number
+      responseFormat?: { type: 'json_object' }
     } = {}
   ): Promise<string> {
     if (!this.apiConfig) {
@@ -84,28 +85,36 @@ export abstract class BaseAgent {
     logger.debug(`[BaseAgent] Calling LLM for agent '${this.agentId}'`, {
       modelId: modelIdToSend,
       originalModelId: this.apiConfig.modelId,
-      messageCount: messages.length
+      messageCount: messages.length,
+      responseFormat: options.responseFormat?.type
     })
 
     // Get provider for the model to help AI server identify it correctly
     const { getProviderForModel } = await import('@/lib/ai-config')
     const provider = getProviderForModel(this.apiConfig.modelId)
 
+    const requestBody: any = {
+      messages,
+      modelId: modelIdToSend,
+      provider: provider, // Include provider to help AI server resolve the model
+      apiKey: this.apiConfig.apiKey,
+      systemPrompt: messages.find(m => m.role === 'system')?.content,
+      temperature: options.temperature ?? this.apiConfig.temperature,
+      maxTokens: options.maxTokens ?? this.apiConfig.maxTokens,
+      topP: options.topP ?? this.apiConfig.topP,
+    }
+
+    // Add responseFormat if specified
+    if (options.responseFormat) {
+      requestBody.responseFormat = options.responseFormat
+    }
+
     const response = await fetch(AI_SERVER_URL, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        messages,
-        modelId: modelIdToSend,
-        provider: provider, // Include provider to help AI server resolve the model
-        apiKey: this.apiConfig.apiKey,
-        systemPrompt: messages.find(m => m.role === 'system')?.content,
-        temperature: options.temperature ?? this.apiConfig.temperature,
-        maxTokens: options.maxTokens ?? this.apiConfig.maxTokens,
-        topP: options.topP ?? this.apiConfig.topP,
-      }),
+      body: JSON.stringify(requestBody),
     })
 
     if (!response.ok) {
@@ -151,26 +160,35 @@ export abstract class BaseAgent {
       reader.releaseLock()
     }
 
-    // Parse SSE format: extract text chunks from "0:\"text\"" format
-    const lines = fullText.split('\n')
+    // Parse data stream format from Vercel AI SDK
+    // Format is either:
+    // 1. Plain text (older format)
+    // 2. Data stream chunks: "0:\"text\"" (current format)
+    
+    const lines = fullText.split('\n').filter(l => l.trim())
     const textParts: string[] = []
     
     for (const line of lines) {
-      // Match "0:"text content" or "[index]:"text content""
+      // Match data stream format: "0:"text content""
       const match = line.match(/^\d+:"(.+)"$/)
       if (match) {
-        // Unescape literal escape sequences (\n, \t, etc.)
+        // Unescape but preserve JSON backslashes
         const unescaped = match[1]
           .replace(/\\n/g, '\n')
           .replace(/\\t/g, '\t')
           .replace(/\\r/g, '\r')
-          .replace(/\\\\/g, '\\')
+          .replace(/\\"/g, '"')  // Unescape quotes
+          .replace(/\\\\\\\\/g, '\\\\') // Preserve JSON backslashes (reduce quad backslash to double)
         textParts.push(unescaped)
+      } else if (line.trim()) {
+        // Not in data stream format, use as-is
+        textParts.push(line)
       }
     }
 
     // Return concatenated text or original if no matches found
-    return textParts.length > 0 ? textParts.join('') : fullText.trim()
+    const result = textParts.length > 0 ? textParts.join('') : fullText.trim()
+    return result
   }
 
   /**

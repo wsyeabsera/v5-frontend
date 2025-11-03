@@ -4,7 +4,7 @@ import * as React from 'react'
 import { useRouter } from 'next/navigation'
 import { useTheme } from 'next-themes'
 import { Command } from 'cmdk'
-import { Home, MessageSquare, Settings, Moon, Sun, Search } from 'lucide-react'
+import { Home, MessageSquare, Settings, Moon, Sun, Search, Sparkles, Brain, ListChecks, GitBranch, List } from 'lucide-react'
 
 export function CommandPalette() {
   const [open, setOpen] = React.useState(false)
@@ -69,7 +69,6 @@ export function CommandPalette() {
                   <Home className="h-3.5 w-3.5" />
                   <span>Dashboard</span>
                 </div>
-                <kbd className="hidden md:inline-block rounded bg-muted/50 px-1.5 py-0.5 text-[10px] font-mono">⌘1</kbd>
               </Command.Item>
               <Command.Item
                 onSelect={() => runCommand(() => router.push('/chat'))}
@@ -79,7 +78,15 @@ export function CommandPalette() {
                   <MessageSquare className="h-3.5 w-3.5" />
                   <span>Chat</span>
                 </div>
-                <kbd className="hidden md:inline-block rounded bg-muted/50 px-1.5 py-0.5 text-[10px] font-mono">⌘2</kbd>
+              </Command.Item>
+              <Command.Item
+                onSelect={() => runCommand(() => router.push('/requests'))}
+                className="flex cursor-pointer items-center justify-between gap-2 rounded-md px-2 py-1.5 text-[13px] hover:bg-accent/10 aria-selected:bg-accent/10"
+              >
+                <div className="flex items-center gap-2">
+                  <List className="h-3.5 w-3.5" />
+                  <span>Requests</span>
+                </div>
               </Command.Item>
               <Command.Item
                 onSelect={() => runCommand(() => router.push('/settings'))}
@@ -89,7 +96,50 @@ export function CommandPalette() {
                   <Settings className="h-3.5 w-3.5" />
                   <span>Settings</span>
                 </div>
-                <kbd className="hidden md:inline-block rounded bg-muted/50 px-1.5 py-0.5 text-[10px] font-mono">⌘3</kbd>
+              </Command.Item>
+            </Command.Group>
+
+            <Command.Separator className="my-1 h-px bg-border/40 dark:bg-border/20" />
+
+            <Command.Group className="mb-1">
+              <div className="px-2 py-1.5 text-[10px] uppercase font-semibold text-muted-foreground/70 tracking-wider">
+                Agent Pipeline
+              </div>
+              <Command.Item
+                onSelect={() => runCommand(() => router.push('/agents/pipeline'))}
+                className="flex cursor-pointer items-center justify-between gap-2 rounded-md px-2 py-1.5 text-[13px] hover:bg-accent/10 aria-selected:bg-accent/10"
+              >
+                <div className="flex items-center gap-2">
+                  <GitBranch className="h-3.5 w-3.5" />
+                  <span>Pipeline Overview</span>
+                </div>
+              </Command.Item>
+              <Command.Item
+                onSelect={() => runCommand(() => router.push('/agents/complexity-detector'))}
+                className="flex cursor-pointer items-center justify-between gap-2 rounded-md px-2 py-1.5 text-[13px] hover:bg-accent/10 aria-selected:bg-accent/10"
+              >
+                <div className="flex items-center gap-2">
+                  <Sparkles className="h-3.5 w-3.5" />
+                  <span>Complexity Detector</span>
+                </div>
+              </Command.Item>
+              <Command.Item
+                onSelect={() => runCommand(() => router.push('/agents/thought-agent'))}
+                className="flex cursor-pointer items-center justify-between gap-2 rounded-md px-2 py-1.5 text-[13px] hover:bg-accent/10 aria-selected:bg-accent/10"
+              >
+                <div className="flex items-center gap-2">
+                  <Brain className="h-3.5 w-3.5" />
+                  <span>Thought Agent</span>
+                </div>
+              </Command.Item>
+              <Command.Item
+                onSelect={() => runCommand(() => router.push('/agents/planner-agent'))}
+                className="flex cursor-pointer items-center justify-between gap-2 rounded-md px-2 py-1.5 text-[13px] hover:bg-accent/10 aria-selected:bg-accent/10"
+              >
+                <div className="flex items-center gap-2">
+                  <ListChecks className="h-3.5 w-3.5" />
+                  <span>Planner Agent</span>
+                </div>
               </Command.Item>
             </Command.Group>
 

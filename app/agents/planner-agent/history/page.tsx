@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { PlannerHistoryList } from '@/components/planner/PlannerHistoryList'
 import { ArrowLeft, RefreshCw, History, Trash2 } from 'lucide-react'
 import { DeleteAllDialog } from '@/components/ui/delete-all-dialog'
+import { Breadcrumbs } from '@/components/ui/breadcrumbs'
 import Link from 'next/link'
 import {
   Dialog,
@@ -91,6 +92,11 @@ export default function PlannerAgentHistoryPage() {
   return (
     <div className="min-h-screen p-6">
       <div className="max-w-6xl mx-auto space-y-6">
+        <Breadcrumbs items={[
+          { label: 'Agent Pipeline', href: '/agents/pipeline' },
+          { label: 'Planner Agent', href: '/agents/planner-agent' },
+          { label: 'History' },
+        ]} />
         {/* Header */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">

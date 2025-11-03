@@ -9,11 +9,14 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
+import { Breadcrumbs } from '@/components/ui/breadcrumbs'
+import { PipelineBanner } from '@/components/agents/PipelineBanner'
 import { ComplexityResult } from '@/components/complexity/ComplexityResult'
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { getRequest } from '@/lib/api/requests-api'
 import { useStore } from '@/lib/store'
 import { useAgentConfigs, useModels } from '@/lib/queries'
-import { Sparkles, Loader2, History, Settings, Check } from 'lucide-react'
+import { Sparkles, Loader2, History, Settings, Check, ChevronDown, Inbox } from 'lucide-react'
 import Link from 'next/link'
 
 export default function ComplexityDetectorPage() {
@@ -24,6 +27,7 @@ export default function ComplexityDetectorPage() {
   const [error, setError] = useState<string | null>(null)
   const [useRequestId, setUseRequestId] = useState(false)
   const [selectedAgentId, setSelectedAgentId] = useState<string>('')
+  const [configOpen, setConfigOpen] = useState(false)
   
   const { data: agentConfigsData } = useAgentConfigs()
   const { data: modelsData } = useModels()
@@ -54,6 +58,19 @@ export default function ComplexityDetectorPage() {
 
   // Get model test results for badge display (we still need this from store)
   const { modelTestResults } = useStore()
+
+  // Load config open state from localStorage
+  useEffect(() => {
+    const saved = localStorage.getItem('complexity-detector-config-open')
+    if (saved !== null) {
+      setConfigOpen(JSON.parse(saved))
+    }
+  }, [])
+
+  // Save config open state to localStorage
+  useEffect(() => {
+    localStorage.setItem('complexity-detector-config-open', JSON.stringify(configOpen))
+  }, [configOpen])
 
   const handleDetect = async () => {
     if (!userQuery.trim() && !requestId.trim()) {
@@ -98,16 +115,17 @@ export default function ComplexityDetectorPage() {
     }
   }
 
-  const loadFromRequestId = async () => {
-    if (!requestId.trim()) return
+  const loadFromRequestId = async (id?: string) => {
+    const targetId = id || requestId
+    if (!targetId.trim()) return
 
     try {
-      const request = await getRequest(requestId)
+      const request = await getRequest(targetId)
       if (request && request.userQuery) {
         setUserQuery(request.userQuery)
         setUseRequestId(false)
       } else {
-        setError(`Request ${requestId} not found or has no user query`)
+        setError(`Request ${targetId} not found or has no user query`)
       }
     } catch (err: any) {
       setError(`Failed to load request: ${err.message}`)
@@ -116,10 +134,15 @@ export default function ComplexityDetectorPage() {
 
   return (
     <div className="min-h-screen p-6">
-      <div className="max-w-4xl mx-auto space-y-6">
+      <div className="max-w-7xl mx-auto space-y-6">
+        <Breadcrumbs items={[
+          { label: 'Agent Pipeline', href: '/agents/pipeline' },
+          { label: 'Complexity Detector' },
+        ]} />
+        <PipelineBanner currentAgent="complexity-detector" />
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="mb-1">Complexity Detector Agent</h1>
+            <h1 className="text-2xl font-bold mb-1">Complexity Detector</h1>
             <p className="text-[13px] text-muted-foreground">
               Analyze query complexity using semantic matching with Ollama embeddings
             </p>
@@ -132,196 +155,241 @@ export default function ComplexityDetectorPage() {
           </Link>
         </div>
 
-        {/* Agent Config Selector */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Settings className="w-5 h-5" />
-              Agent Configuration
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="agentConfig">Select Agent Configuration</Label>
-              <Select
-                value={selectedAgentId}
-                onValueChange={setSelectedAgentId}
-                disabled={loading || enabledConfigs.length === 0}
-              >
-                <SelectTrigger id="agentConfig">
-                  <SelectValue placeholder="Select an agent configuration">
-                    {selectedConfig && (
+        {/* Split-screen Layout */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Left Column: Form */}
+          <div className="space-y-6">
+            {/* Agent Config Selector - Collapsible */}
+            <Collapsible open={configOpen} onOpenChange={setConfigOpen}>
+              <Card>
+                <CollapsibleTrigger asChild>
+                  <CardHeader className="cursor-pointer hover:bg-muted/50 transition-colors">
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="flex items-center gap-2">
+                        <Settings className="w-5 h-5" />
+                        Agent Configuration
+                      </CardTitle>
                       <div className="flex items-center gap-2">
-                        <span className="font-medium">{selectedConfig.name}</span>
-                        {selectedConfig.modelId && modelTestResults[selectedConfig.modelId]?.status === 'success' && (
-                          <Badge variant="outline" className="bg-green-500/10 text-green-600 dark:text-green-400 border-green-200 dark:border-green-900">
-                            <Check className="w-3 h-3 mr-1" />
-                            Verified
+                        {selectedConfig && (
+                          <Badge variant="outline" className="text-xs">
+                            {selectedConfig.name}
                           </Badge>
+                        )}
+                        <ChevronDown className={`w-4 h-4 transition-transform ${configOpen ? 'rotate-180' : ''}`} />
+                      </div>
+                    </div>
+                  </CardHeader>
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <CardContent className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="agentConfig">Select Agent Configuration</Label>
+                      <Select
+                        value={selectedAgentId}
+                        onValueChange={setSelectedAgentId}
+                        disabled={loading || enabledConfigs.length === 0}
+                      >
+                        <SelectTrigger id="agentConfig">
+                          <SelectValue placeholder="Select an agent configuration">
+                            {selectedConfig && (
+                              <div className="flex items-center gap-2">
+                                <span className="font-medium">{selectedConfig.name}</span>
+                                {selectedConfig.modelId && modelTestResults[selectedConfig.modelId]?.status === 'success' && (
+                                  <Badge variant="outline" className="bg-green-500/10 text-green-600 dark:text-green-400 border-green-200 dark:border-green-900">
+                                    <Check className="w-3 h-3 mr-1" />
+                                    Verified
+                                  </Badge>
+                                )}
+                              </div>
+                            )}
+                          </SelectValue>
+                        </SelectTrigger>
+                        <SelectContent>
+                          {enabledConfigs.length === 0 ? (
+                            <div className="p-4 text-sm text-muted-foreground text-center">
+                              No enabled agent configurations available. Configure agents in Settings.
+                            </div>
+                          ) : (
+                            enabledConfigs.map((config: AgentConfig) => {
+                              const model = models.find((m: any) => m.id === config.modelId)
+                              const isTested = config.modelId ? modelTestResults[config.modelId]?.status === 'success' : false
+                              return (
+                                <SelectItem key={config.agentId} value={config.agentId}>
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-medium">{config.name}</span>
+                                    {isTested && (
+                                      <Badge variant="outline" className="bg-green-500/10 text-green-600 dark:text-green-400 border-green-200 dark:border-green-900 ml-auto">
+                                        <Check className="w-3 h-3 mr-1" />
+                                        Tested
+                                      </Badge>
+                                    )}
+                                    {model && (
+                                      <span className="text-xs text-muted-foreground">({model.provider})</span>
+                                    )}
+                                  </div>
+                                </SelectItem>
+                              )
+                            })
+                          )}
+                        </SelectContent>
+                      </Select>
+                      <p className="text-xs text-muted-foreground">
+                        Choose which agent configuration to use for complexity detection. The selected config's model and parameters will be used for LLM calls.
+                      </p>
+                    </div>
+
+                    {/* Selected Config Details */}
+                    {selectedConfig && (
+                      <div className="p-4 rounded-lg bg-muted/50 border border-border/50 space-y-3">
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <h4 className="font-semibold text-sm mb-1">{selectedConfig.name}</h4>
+                            <p className="text-xs text-muted-foreground">{selectedConfig.description}</p>
+                          </div>
+                          <Badge variant={selectedConfig.enabled ? 'default' : 'secondary'}>
+                            {selectedConfig.enabled ? 'Enabled' : 'Disabled'}
+                          </Badge>
+                        </div>
+                        {selectedModel && (
+                          <div className="flex items-center gap-2 text-sm">
+                            <span className="text-muted-foreground">Model:</span>
+                            <span className="font-medium">{selectedModel.name}</span>
+                            <span className="text-xs text-muted-foreground">({selectedModel.provider})</span>
+                          </div>
+                        )}
+                        {selectedConfig.parameters && (
+                          <div className="grid grid-cols-3 gap-2 text-xs pt-2 border-t border-border/40">
+                            <div>
+                              <span className="text-muted-foreground">Temperature:</span>
+                              <span className="ml-1 font-mono">{selectedConfig.parameters.temperature?.toFixed(2) || '0.30'}</span>
+                            </div>
+                            <div>
+                              <span className="text-muted-foreground">Max Tokens:</span>
+                              <span className="ml-1 font-mono">{selectedConfig.parameters.maxTokens || 500}</span>
+                            </div>
+                            <div>
+                              <span className="text-muted-foreground">Top P:</span>
+                              <span className="ml-1 font-mono">{selectedConfig.parameters.topP?.toFixed(2) || '0.90'}</span>
+                            </div>
+                          </div>
                         )}
                       </div>
                     )}
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  {enabledConfigs.length === 0 ? (
-                    <div className="p-4 text-sm text-muted-foreground text-center">
-                      No enabled agent configurations available. Configure agents in Settings.
-                    </div>
-                  ) : (
-                    enabledConfigs.map((config: AgentConfig) => {
-                      const model = models.find((m: any) => m.id === config.modelId)
-                      const isTested = config.modelId ? modelTestResults[config.modelId]?.status === 'success' : false
-                      return (
-                        <SelectItem key={config.agentId} value={config.agentId}>
-                          <div className="flex items-center gap-2">
-                            <span className="font-medium">{config.name}</span>
-                            {isTested && (
-                              <Badge variant="outline" className="bg-green-500/10 text-green-600 dark:text-green-400 border-green-200 dark:border-green-900 ml-auto">
-                                <Check className="w-3 h-3 mr-1" />
-                                Tested
-                              </Badge>
-                            )}
-                            {model && (
-                              <span className="text-xs text-muted-foreground">({model.provider})</span>
-                            )}
-                          </div>
-                        </SelectItem>
-                      )
-                    })
-                  )}
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-muted-foreground">
-                Choose which agent configuration to use for complexity detection. The selected config's model and parameters will be used for LLM calls.
-              </p>
-            </div>
+                  </CardContent>
+                </CollapsibleContent>
+              </Card>
+            </Collapsible>
 
-            {/* Selected Config Details */}
-            {selectedConfig && (
-              <div className="p-4 rounded-lg bg-muted/50 border border-border/50 space-y-3">
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <h4 className="font-semibold text-sm mb-1">{selectedConfig.name}</h4>
-                    <p className="text-xs text-muted-foreground">{selectedConfig.description}</p>
-                  </div>
-                  <Badge variant={selectedConfig.enabled ? 'default' : 'secondary'}>
-                    {selectedConfig.enabled ? 'Enabled' : 'Disabled'}
-                  </Badge>
-                </div>
-                {selectedModel && (
-                  <div className="flex items-center gap-2 text-sm">
-                    <span className="text-muted-foreground">Model:</span>
-                    <span className="font-medium">{selectedModel.name}</span>
-                    <span className="text-xs text-muted-foreground">({selectedModel.provider})</span>
-                  </div>
-                )}
-                {selectedConfig.parameters && (
-                  <div className="grid grid-cols-3 gap-2 text-xs pt-2 border-t border-border/40">
-                    <div>
-                      <span className="text-muted-foreground">Temperature:</span>
-                      <span className="ml-1 font-mono">{selectedConfig.parameters.temperature?.toFixed(2) || '0.30'}</span>
-                    </div>
-                    <div>
-                      <span className="text-muted-foreground">Max Tokens:</span>
-                      <span className="ml-1 font-mono">{selectedConfig.parameters.maxTokens || 500}</span>
-                    </div>
-                    <div>
-                      <span className="text-muted-foreground">Top P:</span>
-                      <span className="ml-1 font-mono">{selectedConfig.parameters.topP?.toFixed(2) || '0.90'}</span>
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Input Section */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Input</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                id="useRequestId"
-                checked={useRequestId}
-                onChange={(e) => setUseRequestId(e.target.checked)}
-                className="rounded"
-              />
-              <Label htmlFor="useRequestId" className="cursor-pointer">
-                Use Request ID
-              </Label>
-            </div>
-
-            {useRequestId ? (
-              <div className="space-y-2">
-                <Label htmlFor="requestId">Request ID</Label>
-                <div className="flex gap-2">
-                  <Input
-                    id="requestId"
-                    value={requestId}
-                    onChange={(e) => setRequestId(e.target.value)}
-                    placeholder="Enter request ID..."
-                    disabled={loading}
+            {/* Input Section */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Input</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="useRequestId"
+                    checked={useRequestId}
+                    onChange={(e) => setUseRequestId(e.target.checked)}
+                    className="rounded"
                   />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={loadFromRequestId}
-                    disabled={loading}
-                  >
-                    Load
-                  </Button>
+                  <Label htmlFor="useRequestId" className="cursor-pointer">
+                    Use Request ID
+                  </Label>
                 </div>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                <Label htmlFor="userQuery">User Query</Label>
-                <Textarea
-                  id="userQuery"
-                  value={userQuery}
-                  onChange={(e) => setUserQuery(e.target.value)}
-                  placeholder="Enter a user query to analyze..."
-                  rows={4}
-                  disabled={loading}
-                />
-              </div>
+
+                {useRequestId ? (
+                  <div className="space-y-2">
+                    <Label htmlFor="requestId">Request ID</Label>
+                    <div className="flex gap-2">
+                      <Input
+                        id="requestId"
+                        value={requestId}
+                        onChange={(e) => setRequestId(e.target.value)}
+                        placeholder="Enter request ID..."
+                        disabled={loading}
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => loadFromRequestId()}
+                        disabled={loading}
+                      >
+                        Load
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <Label htmlFor="userQuery">User Query</Label>
+                    <Textarea
+                      id="userQuery"
+                      value={userQuery}
+                      onChange={(e) => setUserQuery(e.target.value)}
+                      placeholder="Enter a user query to analyze..."
+                      rows={4}
+                      disabled={loading}
+                    />
+                  </div>
+                )}
+
+                <Button
+                  onClick={handleDetect}
+                  disabled={loading || (!userQuery.trim() && !requestId.trim()) || !selectedAgentId || !selectedConfig}
+                  className="w-full gap-2"
+                >
+                  {loading ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Analyzing...
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="w-4 h-4" />
+                      Detect Complexity
+                    </>
+                  )}
+                </Button>
+              </CardContent>
+            </Card>
+
+            {/* Error Display */}
+            {error && (
+              <Card className="border-destructive bg-destructive/10">
+                <CardContent className="pt-6">
+                  <p className="text-sm text-destructive">{error}</p>
+                </CardContent>
+              </Card>
             )}
+          </div>
 
-            <Button
-              onClick={handleDetect}
-              disabled={loading || (!userQuery.trim() && !requestId.trim()) || !selectedAgentId || !selectedConfig}
-              className="w-full gap-2"
-            >
-              {loading ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  Analyzing...
-                </>
-              ) : (
-                <>
-                  <Sparkles className="w-4 h-4" />
-                  Detect Complexity
-                </>
-              )}
-            </Button>
-          </CardContent>
-        </Card>
-
-        {/* Error Display */}
-        {error && (
-          <Card className="border-destructive bg-destructive/10">
-            <CardContent className="pt-6">
-              <p className="text-sm text-destructive">{error}</p>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Results Display */}
-        {result && <ComplexityResult result={result} />}
+          {/* Right Column: Results */}
+          <div className="space-y-6">
+            {loading ? (
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="flex items-center justify-center py-12">
+                    <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+                    <span className="ml-2 text-sm text-muted-foreground">Analyzing...</span>
+                  </div>
+                </CardContent>
+              </Card>
+            ) : result ? (
+              <ComplexityResult result={result} />
+            ) : (
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="flex flex-col items-center justify-center py-12 text-center">
+                    <Inbox className="w-12 h-12 text-muted-foreground/50 mb-3" />
+                    <p className="text-sm font-medium text-muted-foreground mb-1">No Results Yet</p>
+                    <p className="text-xs text-muted-foreground">Submit a query to see complexity analysis results</p>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   )

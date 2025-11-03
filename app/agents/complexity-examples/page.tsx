@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { ComplexityExample } from '@/types'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Breadcrumbs } from '@/components/ui/breadcrumbs'
 import { ExampleForm } from '@/components/complexity/ExampleForm'
 import { ExampleList } from '@/components/complexity/ExampleList'
 import {
@@ -137,6 +138,10 @@ export default function ComplexityExamplesPage() {
   return (
     <div className="min-h-screen p-6">
       <div className="max-w-6xl mx-auto space-y-6">
+        <Breadcrumbs items={[
+          { label: 'Training Data', href: '/agents/pipeline' },
+          { label: 'Complexity Examples' },
+        ]} />
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>

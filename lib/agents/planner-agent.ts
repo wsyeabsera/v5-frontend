@@ -13,9 +13,11 @@
  */
 
 import { BaseAgent } from './base-agent'
-import { Thought, Plan, PlanStep, PlannerAgentOutput, RequestContext, MCPContext } from '@/types'
+import { Thought, Plan, PlanStep, PlannerAgentOutput, RequestContext, MCPContext, PlanExample } from '@/types'
 import { logger } from '@/utils/logger'
 import { listMCPPrompts, listMCPTools } from '@/lib/mcp-prompts'
+import { querySimilarPlanExamples, incrementPlanExampleUsage } from '@/lib/pinecone/planner-examples'
+import { generateEmbedding } from '@/lib/ollama/embeddings'
 
 /**
  * Planner Agent Class
@@ -38,49 +40,81 @@ Your planning should be:
 - Realistic: Consider constraints and limitations
 - Parameter-extracting: Extract values from user query and thoughts (e.g., "facility ABC" → shortCode="ABC")
 
-When given reasoning thoughts, create a detailed action plan with:
-
-GOAL: [Clear statement of the objective]
-
-STEPS:
-1. [Step description]
-   Action: [exact tool name from available tools]
-   Parameters: {exact_parameter_name: extracted_value, ...}
-   Expected: [what should happen]
-   Depends on: [step numbers if any]
-
-2. [Next step]
-   ...
-
-RATIONALE: [Why this plan will work]
-
 CRITICAL FORMAT REQUIREMENTS:
 1. Parameter Names: MUST use EXACT parameter names from tool schemas (e.g., use "facilityId", not "id" or "facility_id")
 2. Parameter Extraction: Extract values from user query:
    - "facility ABC" → shortCode: "ABC"
    - "facility ID 123" → facilityId: "123" or id: "123" (check schema)
    - "location Amsterdam" → location: "Amsterdam"
-3. JSON Format: Parameters must be valid JSON with exact parameter names
+3. JSON Format: Parameters must be valid JSON objects with exact parameter names
 4. Tool Names: Use exact tool names as shown in available tools list
-5. Dependencies: Reference step numbers (e.g., "1, 2" or "None")
+5. Dependencies: Reference step numbers (e.g., "1, 2" or [])
 6. Required Parameters: All required parameters from tool schema MUST be included
 
-Example of CORRECT format:
-Action: get_facility
-Parameters: {"id": "6905db9211cc522275d5f013"}
+You MUST respond with ONLY a valid JSON object in this exact format:
 
-Action: list_facilities
-Parameters: {"shortCode": "ABC"}
+{
+  "goal": "Clear statement of the objective based on user query and thoughts",
+  "steps": [
+    {
+      "order": 1,
+      "description": "Clear step description",
+      "action": "exact_tool_name_from_available_tools",
+      "parameters": {
+        "exact_parameter_name": "extracted_value"
+      },
+      "expectedOutcome": "What should happen",
+      "dependencies": ["step-2"] or []
+    }
+  ],
+  "rationale": "Why this plan will work",
+  "confidence": 0.0-1.0,
+  "estimatedComplexity": 0.0-1.0
+}
 
-Action: generate_intelligent_facility_report
-Parameters: {"facilityId": "6905db9211cc522275d5f013", "includeRecommendations": true}
+Example of CORRECT JSON response:
+{
+  "goal": "Analyze facility ABC",
+  "steps": [
+    {
+      "order": 1,
+      "description": "Get facility details",
+      "action": "list_facilities",
+      "parameters": {
+        "shortCode": "ABC"
+      },
+      "expectedOutcome": "Retrieve facility information",
+      "dependencies": []
+    },
+    {
+      "order": 2,
+      "description": "Generate comprehensive facility report",
+      "action": "generate_intelligent_facility_report",
+      "parameters": {
+        "facilityId": "extracted_from_step_1",
+        "includeRecommendations": true
+      },
+      "expectedOutcome": "Detailed facility analysis with AI recommendations",
+      "dependencies": ["step-1"]
+    }
+  ],
+  "rationale": "First retrieve facility data, then generate comprehensive analysis",
+  "confidence": 0.85,
+  "estimatedComplexity": 0.6
+}
 
 Example of INCORRECT format:
-Action: get_facility
-Parameters: {"value": "ABC"}  ❌ WRONG - "value" is not a valid parameter name
+{
+  "steps": [
+    {
+      "action": "get_facility",
+      "parameters": {"value": "ABC"}
+    }
+  ]
+}
+❌ WRONG - "value" is not a valid parameter name, missing required fields
 
-Action: get_facility
-Parameters: {"facility_id": "123"}  ❌ WRONG - should be "id" not "facility_id" (check schema)`
+Remember: You are outputting JSON only, no text before or after the JSON object.`
 
   constructor() {
     super('planner-agent')
@@ -118,14 +152,52 @@ Parameters: {"facility_id": "123"}  ❌ WRONG - should be "id" not "facility_id"
   }
 
   /**
+   * Fetch semantic context from Pinecone
+   * 
+   * Queries for similar plan examples based on user query.
+   * 
+   * @param userQuery - User query to find similar examples for
+   * @returns Array of similar examples with similarity scores
+   */
+  async fetchSemanticContext(userQuery: string): Promise<Array<{ example: PlanExample; similarity: number }>> {
+    try {
+      const embedding = await generateEmbedding(userQuery)
+      const results = await querySimilarPlanExamples(embedding, 3, 0.7)
+      
+      // Increment usage count for matched examples
+      for (const result of results) {
+        try {
+          await incrementPlanExampleUsage(result.example.id)
+        } catch (err) {
+          logger.warn(`[PlannerAgent] Failed to increment usage for example ${result.example.id}:`, err)
+        }
+      }
+
+      logger.debug(`[PlannerAgent] Found similar examples`, {
+        count: results.length,
+        similarities: results.map(r => r.similarity.toFixed(2)),
+      })
+
+      return results
+    } catch (error: any) {
+      logger.error(`[PlannerAgent] Failed to fetch semantic context:`, error)
+      return []
+    }
+  }
+
+  /**
    * Build enhanced system prompt with context
    * 
-   * Dynamically constructs system prompt with MCP context.
+   * Dynamically constructs system prompt with MCP context and similar examples.
    * 
    * @param mcpContext - MCP tools/resources/prompts
+   * @param similarExamples - Similar plan examples from Pinecone
    * @returns Enhanced system prompt
    */
-  private buildEnhancedSystemPrompt(mcpContext: MCPContext): string {
+  private buildEnhancedSystemPrompt(
+    mcpContext: MCPContext,
+    similarExamples: Array<{ example: PlanExample; similarity: number }> = []
+  ): string {
     let prompt = this.baseSystemPrompt + '\n\n'
 
     // Add MCP tools context (critical for planning)
@@ -244,6 +316,30 @@ Parameters: {"facility_id": "123"}  ❌ WRONG - should be "id" not "facility_id"
       prompt += '\n'
     }
 
+    // Add similar examples context (vector-based learning)
+    if (similarExamples.length > 0) {
+      prompt += '## Similar Successful Plans\n\n'
+      prompt += 'Learn parameter extraction patterns from these proven examples:\n\n'
+
+      for (const { example, similarity } of similarExamples) {
+        prompt += `### Example (${(similarity * 100).toFixed(0)}% similar): "${example.query}"\n`
+        prompt += `Goal: ${example.goal}\n`
+        
+        if (example.steps && example.steps.length > 0) {
+          prompt += 'Steps with parameters:\n'
+          for (const step of example.steps) {
+            prompt += `  ${step.action}${step.parameters && Object.keys(step.parameters).length > 0 ? `: ${JSON.stringify(step.parameters)}` : ' (no params)'}\n`
+          }
+        }
+        
+        if (example.successRating >= 0.9) {
+          prompt += `✅ Highly successful (${(example.successRating * 100).toFixed(0)}% success rate)\n`
+        }
+
+        prompt += '\n'
+      }
+    }
+
     // Add domain knowledge
     prompt += '## Domain Knowledge\n\n'
     prompt += '- Waste management facility operations\n'
@@ -253,11 +349,12 @@ Parameters: {"facility_id": "123"}  ❌ WRONG - should be "id" not "facility_id"
     prompt += '- Contract management and validation\n\n'
 
     prompt += '## Your Task\n\n'
-    prompt += 'Given the reasoning thoughts, create a structured plan that:\n'
+    prompt += 'Given the reasoning thoughts and examples above, create a structured plan that:\n'
     prompt += '1. Breaks down the goal into clear, ordered steps\n'
-    prompt += '2. Uses appropriate MCP tools with specific parameters\n'
-    prompt += '3. Identifies dependencies between steps\n'
-    prompt += '4. Specifies expected outcomes for each step\n'
+    prompt += '2. Uses appropriate MCP tools with EXACT parameter names from schemas\n'
+    prompt += '3. Extracts parameter values from user query (learn from examples)\n'
+    prompt += '4. Identifies dependencies between steps\n'
+    prompt += '5. Specifies expected outcomes for each step\n'
 
     return prompt
   }
@@ -301,28 +398,31 @@ Parameters: {"facility_id": "123"}  ❌ WRONG - should be "id" not "facility_id"
   /**
    * Generate a plan from thoughts
    * 
-   * Enhanced with MCP context.
+   * Enhanced with MCP context and semantic memory.
    * 
    * @param thoughts - Thoughts from Thought Agent
    * @param userQuery - Original user query
    * @param requestContext - Request ID context from Thought Agent
    * @param mcpContext - Optional MCP context (will be fetched if not provided)
+   * @param similarExamples - Optional similar examples (will be fetched if not provided)
    * @returns PlannerAgentOutput with structured plan
    */
   async generatePlan(
     thoughts: Thought[],
     userQuery: string,
     requestContext: RequestContext,
-    mcpContext?: MCPContext
+    mcpContext?: MCPContext,
+    similarExamples?: Array<{ example: PlanExample; similarity: number }>
   ): Promise<PlannerAgentOutput> {
     // Step 1: Add this agent to the request chain
     const updatedContext = this.addToChain(requestContext)
 
     // Step 2: Fetch context if not provided
     const contextToUse = mcpContext || await this.fetchMCPContext()
+    const examplesToUse = similarExamples || await this.fetchSemanticContext(userQuery)
 
     // Step 3: Build enhanced system prompt
-    const enhancedSystemPrompt = this.buildEnhancedSystemPrompt(contextToUse)
+    const enhancedSystemPrompt = this.buildEnhancedSystemPrompt(contextToUse, examplesToUse)
 
     // Step 4: Build the prompt for the LLM
     const prompt = this.buildPlanningPrompt(thoughts, userQuery, contextToUse)
@@ -337,11 +437,13 @@ Parameters: {"facility_id": "123"}  ❌ WRONG - should be "id" not "facility_id"
       requestId: updatedContext.requestId,
       thoughtsCount: thoughts.length,
       toolsCount: contextToUse.tools.length,
+      similarExamplesCount: examplesToUse.length,
     })
 
     const response = await this.callLLM(messages, {
       temperature: 0.5, // More structured, less creative
       maxTokens: 2000,
+      responseFormat: { type: 'json_object' } // Force JSON output
     })
 
     // Step 6: Parse the structured response
@@ -583,6 +685,88 @@ Refine this plan. Fix issues. Incorporate new requirements. Maintain the structu
     goal: string,
     thoughts?: Thought[]
   ): Plan {
+    // Try to parse as JSON first (for JSON mode responses)
+    try {
+      const cleanResponse = response.trim()
+      logger.info(`[PlannerAgent] Attempting to parse JSON response`, {
+        responseLength: cleanResponse.length,
+        responsePreview: cleanResponse.substring(0, 500)
+      })
+      
+      // Try to find the first complete JSON object
+      // This handles cases where there might be extra characters after the JSON
+      let jsonStart = cleanResponse.indexOf('{')
+      if (jsonStart === -1) {
+        throw new Error('No JSON object found in response')
+      }
+      
+      // Find the matching closing brace
+      let braceCount = 0
+      let jsonEnd = -1
+      for (let i = jsonStart; i < cleanResponse.length; i++) {
+        if (cleanResponse[i] === '{') braceCount++
+        if (cleanResponse[i] === '}') {
+          braceCount--
+          if (braceCount === 0) {
+            jsonEnd = i + 1
+            break
+          }
+        }
+      }
+      
+      if (jsonEnd === -1) {
+        throw new Error('Incomplete JSON object in response')
+      }
+      
+      const jsonStr = cleanResponse.substring(jsonStart, jsonEnd)
+      logger.debug(`[PlannerAgent] Extracted JSON string`, {
+        jsonLength: jsonStr.length,
+        jsonPreview: jsonStr.substring(0, 200)
+      })
+      
+      const parsed = JSON.parse(jsonStr)
+        
+        // Validate and construct Plan from JSON
+        if (parsed.goal && parsed.steps && Array.isArray(parsed.steps)) {
+          logger.debug(`[PlannerAgent] Successfully parsed JSON plan`, {
+            stepsCount: parsed.steps.length
+          })
+          
+          return {
+            id: `plan-${Date.now()}`,
+            goal: parsed.goal,
+            steps: parsed.steps.map((s: any, idx: number) => ({
+              id: `step-${idx + 1}`,
+              order: s.order || idx + 1,
+              description: s.description || '',
+              action: s.action || 'unknown',
+              parameters: s.parameters || {},
+              expectedOutcome: s.expectedOutcome || 'Success',
+              dependencies: Array.isArray(s.dependencies) ? s.dependencies : [],
+              status: 'pending' as const,
+            })),
+            estimatedComplexity: typeof parsed.estimatedComplexity === 'number' 
+              ? parsed.estimatedComplexity 
+              : this.estimateComplexity(parsed.steps),
+            confidence: typeof parsed.confidence === 'number' 
+              ? parsed.confidence 
+              : (thoughts?.length ? thoughts.reduce((sum, t) => sum + t.confidence, 0) / thoughts.length : 0.7) * 0.9,
+            dependencies: parsed.steps.flatMap((s: any) => 
+              Array.isArray(s.dependencies) ? s.dependencies : []
+            ),
+            createdAt: new Date(),
+          }
+        }
+    } catch (parseError: any) {
+      // JSON parsing failed, fall back to text parsing
+      logger.warn(`[PlannerAgent] JSON parse failed, falling back to text parsing: ${parseError?.message}`)
+    }
+
+    // Fallback to original text-based parsing
+    logger.info(`[PlannerAgent] Using fallback text parsing`, {
+      responseLength: response.length,
+      responsePreview: response.substring(0, 500)
+    })
     const goalMatch = this.extractSection(response, 'GOAL')
     const stepsText = this.extractSection(response, 'STEPS') || response
     const steps = this.parseSteps(stepsText)

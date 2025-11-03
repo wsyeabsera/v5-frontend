@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Breadcrumbs } from '@/components/ui/breadcrumbs'
 import { BaseAgentOutput } from '@/types'
 import { Loader2, Sparkles } from 'lucide-react'
 
@@ -47,6 +48,10 @@ export default function BaseAgentPage() {
   return (
     <div className="min-h-screen p-6">
       <div className="max-w-4xl mx-auto space-y-6">
+        <Breadcrumbs items={[
+          { label: 'System', href: '/settings' },
+          { label: 'Base Agent' },
+        ]} />
         <div>
           <h1 className="text-2xl font-bold mb-1">Base Agent Test</h1>
           <p className="text-[13px] text-muted-foreground">
