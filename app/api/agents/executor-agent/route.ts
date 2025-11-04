@@ -168,8 +168,7 @@ export async function POST(req: NextRequest) {
       planToExecute,
       updatedRequestContext,
       critique,
-      userFeedback,
-      userQuery
+      userFeedback
     )
 
     // Store output in MongoDB

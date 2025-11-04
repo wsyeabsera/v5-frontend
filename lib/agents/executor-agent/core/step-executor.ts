@@ -4,7 +4,7 @@
  * Executes individual plan steps with coordination and error handling
  */
 
-import { ExecutionResult, PlanExecutionResult, Plan } from '@/types'
+import { ExecutionResult, PlanExecutionResult, Plan, PlanStep } from '@/types'
 import { ExecutionState, StepExecutionContext } from '../types'
 import { Coordinator } from '../reasoning/coordinator'
 import { ErrorHandler } from '../reasoning/error-handler'

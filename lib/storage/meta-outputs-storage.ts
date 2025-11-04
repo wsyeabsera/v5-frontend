@@ -1,16 +1,16 @@
 /**
- * Confidence Outputs Storage using MongoDB
+ * Meta Outputs Storage using MongoDB
  * 
- * Stores ConfidenceScorerOutput results for history tracking and analytics.
+ * Stores MetaAgentOutput results for history tracking and analytics.
  */
 
 import { getCollection } from './mongodb-client'
-import { ConfidenceScorerOutput } from '@/types'
+import { MetaAgentOutput } from '@/types'
 
-const COLLECTION_NAME = 'confidence_outputs'
+const COLLECTION_NAME = 'meta_outputs'
 
 /**
- * Ensure indexes for confidence outputs collection
+ * Ensure indexes for meta outputs collection
  */
 async function ensureIndexes(): Promise<void> {
   try {
@@ -20,10 +20,11 @@ async function ensureIndexes(): Promise<void> {
     await collection.createIndex({ requestId: 1 })
     await collection.createIndex({ agentName: 1 })
     await collection.createIndex({ timestamp: -1 }) // Descending for newest first
-    await collection.createIndex({ overallConfidence: 1 }) // For filtering by confidence
-    await collection.createIndex({ decision: 1 }) // For filtering by decision
+    await collection.createIndex({ reasoningQuality: 1 }) // For filtering by quality
+    await collection.createIndex({ shouldReplan: 1 }) // For filtering by replan flag
+    await collection.createIndex({ shouldDeepenReasoning: 1 }) // For filtering by deepen flag
     
-    console.log('[MongoDB] Indexes ensured for confidence_outputs collection')
+    console.log('[MongoDB] Indexes ensured for meta_outputs collection')
   } catch (error) {
     console.error('[MongoDB] Failed to create indexes:', error)
     // Don't throw - indexes might already exist
@@ -31,9 +32,9 @@ async function ensureIndexes(): Promise<void> {
 }
 
 /**
- * Confidence Outputs Storage Class
+ * Meta Outputs Storage Class
  */
-export class ConfidenceOutputsStorage {
+export class MetaOutputsStorage {
   /**
    * Ensure indexes are created (call once on startup)
    */
@@ -42,10 +43,10 @@ export class ConfidenceOutputsStorage {
   }
 
   /**
-   * Store a confidence scorer output
+   * Store a meta agent output
    */
-  async save(output: ConfidenceScorerOutput): Promise<void> {
-    const collection = await getCollection<ConfidenceScorerOutput & { _id?: any }>(
+  async save(output: MetaAgentOutput): Promise<void> {
+    const collection = await getCollection<MetaAgentOutput & { _id?: any }>(
       COLLECTION_NAME
     )
 
@@ -54,36 +55,32 @@ export class ConfidenceOutputsStorage {
       requestId: output.requestId,
       agentName: output.agentName,
       timestamp: output.timestamp instanceof Date ? output.timestamp : new Date(output.timestamp),
-      overallConfidence: output.overallConfidence,
-      weightedConfidence: output.weightedConfidence,
-      agentScores: output.agentScores.map(score => ({
-        ...score,
-        timestamp: score.timestamp instanceof Date ? score.timestamp : new Date(score.timestamp),
-      })),
-      decision: output.decision,
-      thresholdUsed: output.thresholdUsed,
-      reasoning: output.reasoning,
+      reasoningQuality: output.reasoningQuality,
+      shouldReplan: output.shouldReplan,
+      shouldDeepenReasoning: output.shouldDeepenReasoning,
+      recommendedActions: output.recommendedActions,
+      assessment: output.assessment,
       createdAt: new Date(),
     }
 
     // Add new optional fields if present
-    if (output.confidenceReasoning !== undefined) {
-      doc.confidenceReasoning = output.confidenceReasoning
+    if (output.reasoningQualityBreakdown !== undefined) {
+      doc.reasoningQualityBreakdown = output.reasoningQualityBreakdown
     }
-    if (output.scoreVariance !== undefined) {
-      doc.scoreVariance = output.scoreVariance
+    if (output.replanStrategy !== undefined) {
+      doc.replanStrategy = output.replanStrategy
     }
-    if (output.scorePattern !== undefined) {
-      doc.scorePattern = output.scorePattern
+    if (output.reasoningDepthRecommendation !== undefined) {
+      doc.reasoningDepthRecommendation = output.reasoningDepthRecommendation
     }
-    if (output.confidenceBreakdown !== undefined) {
-      doc.confidenceBreakdown = output.confidenceBreakdown
+    if (output.focusAreas !== undefined) {
+      doc.focusAreas = output.focusAreas
     }
-    if (output.routingRecommendation !== undefined) {
-      doc.routingRecommendation = output.routingRecommendation
+    if (output.orchestratorDirectives !== undefined) {
+      doc.orchestratorDirectives = output.orchestratorDirectives
     }
-    if (output.agentAnalysis !== undefined) {
-      doc.agentAnalysis = output.agentAnalysis
+    if (output.patternAnalysis !== undefined) {
+      doc.patternAnalysis = output.patternAnalysis
     }
 
     // Store requestContext separately for easier querying
@@ -114,10 +111,10 @@ export class ConfidenceOutputsStorage {
   /**
    * Get an output by request ID
    */
-  async getByRequestId(requestId: string): Promise<ConfidenceScorerOutput | null> {
-    const collection = await getCollection<ConfidenceScorerOutput>(COLLECTION_NAME)
+  async getByRequestId(requestId: string): Promise<MetaAgentOutput | null> {
+    const collection = await getCollection<MetaAgentOutput>(COLLECTION_NAME)
 
-    const result = await collection.findOne({ requestId, agentName: 'confidence-scorer' })
+    const result = await collection.findOne({ requestId, agentName: 'meta-agent' })
 
     if (!result) {
       return null
@@ -127,46 +124,47 @@ export class ConfidenceOutputsStorage {
     return {
       ...result,
       timestamp: result.timestamp instanceof Date ? result.timestamp : new Date(result.timestamp),
-      agentScores: result.agentScores.map(score => ({
-        ...score,
-        timestamp: score.timestamp instanceof Date ? score.timestamp : new Date(score.timestamp),
-      })),
       requestContext: result.requestContext ? {
         ...result.requestContext,
         createdAt: result.requestContext.createdAt instanceof Date 
           ? result.requestContext.createdAt 
           : new Date(result.requestContext.createdAt),
       } : undefined,
-    } as ConfidenceScorerOutput
+    } as MetaAgentOutput
   }
 
   /**
    * Get all outputs with optional filters
    */
   async getAll(filters?: {
-    minConfidence?: number
-    maxConfidence?: number
-    decision?: 'execute' | 'review' | 'rethink' | 'escalate'
+    minReasoningQuality?: number
+    maxReasoningQuality?: number
+    shouldReplan?: boolean
+    shouldDeepenReasoning?: boolean
     startDate?: Date
     endDate?: Date
-  }): Promise<ConfidenceScorerOutput[]> {
-    const collection = await getCollection<ConfidenceScorerOutput>(COLLECTION_NAME)
+  }): Promise<MetaAgentOutput[]> {
+    const collection = await getCollection<MetaAgentOutput>(COLLECTION_NAME)
 
     const query: any = {}
 
     if (filters) {
-      if (filters.minConfidence !== undefined || filters.maxConfidence !== undefined) {
-        query.overallConfidence = {}
-        if (filters.minConfidence !== undefined) {
-          query.overallConfidence.$gte = filters.minConfidence
+      if (filters.minReasoningQuality !== undefined || filters.maxReasoningQuality !== undefined) {
+        query.reasoningQuality = {}
+        if (filters.minReasoningQuality !== undefined) {
+          query.reasoningQuality.$gte = filters.minReasoningQuality
         }
-        if (filters.maxConfidence !== undefined) {
-          query.overallConfidence.$lte = filters.maxConfidence
+        if (filters.maxReasoningQuality !== undefined) {
+          query.reasoningQuality.$lte = filters.maxReasoningQuality
         }
       }
 
-      if (filters.decision) {
-        query.decision = filters.decision
+      if (filters.shouldReplan !== undefined) {
+        query.shouldReplan = filters.shouldReplan
+      }
+
+      if (filters.shouldDeepenReasoning !== undefined) {
+        query.shouldDeepenReasoning = filters.shouldDeepenReasoning
       }
 
       if (filters.startDate || filters.endDate) {
@@ -192,17 +190,13 @@ export class ConfidenceOutputsStorage {
     return results.map((result) => ({
       ...result,
       timestamp: result.timestamp instanceof Date ? result.timestamp : new Date(result.timestamp),
-      agentScores: result.agentScores.map(score => ({
-        ...score,
-        timestamp: score.timestamp instanceof Date ? score.timestamp : new Date(score.timestamp),
-      })),
       requestContext: result.requestContext ? {
         ...result.requestContext,
         createdAt: result.requestContext.createdAt instanceof Date 
           ? result.requestContext.createdAt 
           : new Date(result.requestContext.createdAt),
       } : undefined,
-    })) as ConfidenceScorerOutput[]
+    })) as MetaAgentOutput[]
   }
 
   /**
@@ -210,27 +204,27 @@ export class ConfidenceOutputsStorage {
    */
   async count(): Promise<number> {
     const collection = await getCollection(COLLECTION_NAME)
-    return collection.countDocuments({ agentName: 'confidence-scorer' })
+    return collection.countDocuments({ agentName: 'meta-agent' })
   }
 
   /**
-   * Delete all confidence outputs
+   * Delete all meta outputs
    */
   async clear(): Promise<void> {
     const collection = await getCollection(COLLECTION_NAME)
-    await collection.deleteMany({ agentName: 'confidence-scorer' })
+    await collection.deleteMany({ agentName: 'meta-agent' })
   }
 }
 
 // Singleton instance
-let storageInstance: ConfidenceOutputsStorage | null = null
+let storageInstance: MetaOutputsStorage | null = null
 
 /**
- * Get the singleton ConfidenceOutputsStorage instance
+ * Get the singleton MetaOutputsStorage instance
  */
-export function getConfidenceOutputsStorage(): ConfidenceOutputsStorage {
+export function getMetaOutputsStorage(): MetaOutputsStorage {
   if (!storageInstance) {
-    storageInstance = new ConfidenceOutputsStorage()
+    storageInstance = new MetaOutputsStorage()
   }
   return storageInstance
 }

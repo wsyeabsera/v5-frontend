@@ -570,7 +570,8 @@ export interface ConfidenceScore {
  * Confidence Scorer Output
  */
 export interface ConfidenceScorerOutput extends AgentOutput {
-  overallConfidence: number; // Aggregated score
+  overallConfidence: number; // Simple average (for backward compatibility)
+  weightedConfidence: number; // Weighted average based on agent importance
   agentScores: ConfidenceScore[];
   decision: 'execute' | 'review' | 'rethink' | 'escalate';
   thresholdUsed: {
@@ -579,7 +580,85 @@ export interface ConfidenceScorerOutput extends AgentOutput {
     rethink: number;
     escalate: number;
   };
-  reasoning: string;
+  reasoning: string; // Enhanced reasoning (LLM-powered when available)
+  confidenceReasoning?: string; // Detailed LLM-generated analysis
+  scoreVariance?: number; // Variance in scores (measure of consistency)
+  scorePattern?: 'all-high' | 'all-low' | 'mixed' | 'consistent'; // Pattern detected in scores
+  confidenceBreakdown?: {
+    reasoning: number;
+    planning: number;
+    execution: number;
+  };
+  routingRecommendation?: string; // Specific guidance for orchestrator
+  agentAnalysis?: {
+    primaryDriver: string | null; // Agent driving confidence most
+    lowestConfidence: string | null; // Agent with lowest confidence
+    highestConfidence: string | null; // Agent with highest confidence
+    concerns: string[]; // List of agents with concerns
+  };
+}
+
+/**
+ * Meta-Agent Output
+ */
+export interface MetaAgentOutput extends AgentOutput {
+  reasoningQuality: number; // 0.0-1.0 overall quality
+  shouldReplan: boolean;
+  shouldDeepenReasoning: boolean;
+  recommendedActions: string[];
+  assessment: string; // Human-readable assessment
+  reasoningQualityBreakdown?: {
+    logic: number; // Logical soundness (0.0-1.0)
+    completeness: number; // Completeness of reasoning (0.0-1.0)
+    alignment: number; // Alignment between confidence and quality (0.0-1.0)
+  };
+  replanStrategy?: string; // Specific guidance on what to replan
+  reasoningDepthRecommendation?: number; // How many reasoning passes needed (1-3)
+  focusAreas?: string[]; // Specific areas to focus on in next pass
+  orchestratorDirectives?: string[]; // Specific instructions for orchestrator routing
+  patternAnalysis?: {
+    detectedPatterns: string[]; // Patterns detected across agent outputs
+    inconsistencies: string[]; // Inconsistencies found
+    strengths: string[]; // Strengths identified
+    weaknesses: string[]; // Weaknesses identified
+  };
+}
+
+/**
+ * Replan Agent Output - Enhanced plan based on feedback
+ */
+export interface ReplanAgentOutput extends AgentOutput {
+  plan: Plan; // New improved plan
+  rationale: string; // Why this plan is better than the original
+  changesFromOriginal: {
+    stepsAdded: number;
+    stepsRemoved: number;
+    stepsModified: number;
+    improvements: string[]; // List of specific improvements made
+    removedSteps?: string[]; // Step IDs that were removed
+    addedSteps?: string[]; // Step IDs that were added
+    modifiedSteps?: string[]; // Step IDs that were modified
+  };
+  addressesMetaGuidance: {
+    replanStrategyAddressed: boolean;
+    orchestratorDirectivesAddressed: string[]; // Which directives were addressed
+    focusAreasAddressed: string[]; // Which focus areas were addressed
+    patternIssuesAddressed: string[]; // Which pattern issues were addressed
+  };
+  addressesCriticIssues: {
+    issuesResolved: string[]; // Which critic issues were fixed
+    suggestionsImplemented: string[]; // Which suggestions were used
+    validationWarningsResolved: string[]; // Which validation warnings were fixed
+    followUpQuestionsAddressed: string[]; // Which user feedback questions were incorporated
+  };
+  addressesThoughtRecommendations: {
+    recommendedToolsUsed: string[]; // Which recommended tools are now in the plan
+    keyInsightsIncorporated: string[]; // Which insights were incorporated
+    primaryApproachMaintained: boolean; // Whether the primary approach is maintained
+  };
+  confidence: number; // 0-1, confidence in the new plan
+  planVersion: number; // Incremented version number (original was 1, replan is 2, etc.)
+  originalPlanId: string; // ID of the original plan that was improved
 }
 
 /**

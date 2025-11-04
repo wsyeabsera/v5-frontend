@@ -373,6 +373,12 @@ export class ContextCompressor {
     const { tools, actions: toolActions } = this.compressMCPTools(mcpContext.tools, finalConfig)
     allActions.push(...toolActions)
 
+    // Ensure all tools have inputSchema (required by MCPTool interface)
+    const toolsWithSchema = tools.map(tool => ({
+      ...tool,
+      inputSchema: tool.inputSchema || {}
+    }))
+
     // Prompts are usually shorter, keep them all but truncate descriptions if needed
     const prompts = mcpContext.prompts.map(prompt => {
       if (finalConfig.truncateDescriptions && prompt.description) {
@@ -410,7 +416,7 @@ export class ContextCompressor {
 
     return {
       context: {
-        tools,
+        tools: toolsWithSchema,
         prompts,
         resources
       },

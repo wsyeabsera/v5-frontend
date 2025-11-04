@@ -1,6 +1,6 @@
 'use client'
 
-import { Sparkles, Brain, ListChecks, ShieldCheck, Play, FileText, ChevronRight, Info, X, BarChart } from 'lucide-react'
+import { Sparkles, Brain, ListChecks, ShieldCheck, Play, FileText, ChevronRight, Info, X, BarChart, Eye, RotateCcw } from 'lucide-react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -55,6 +55,20 @@ const pipelineAgents: PipelineAgent[] = [
     href: '/agents/confidence-scorer',
     icon: BarChart,
     description: 'Aggregate confidence scores from multiple agents and make routing decisions',
+  },
+  {
+    id: 'meta-agent',
+    name: 'Meta Agent',
+    href: '/agents/meta-agent',
+    icon: Eye,
+    description: 'Self-awareness layer that questions reasoning quality and manages dynamic reasoning depth',
+  },
+  {
+    id: 'replan-agent',
+    name: 'Replan Agent',
+    href: '/agents/replan-agent',
+    icon: RotateCcw,
+    description: 'Generate improved plans by learning from Meta, Critic, and Thought agent feedback',
   },
   {
     id: 'executor-agent',
@@ -184,7 +198,7 @@ export function PipelineBanner({ currentAgent, requestId }: PipelineBannerProps)
               <h4 className="text-xs font-semibold mb-2">Pipeline Flow</h4>
               <div className="space-y-2 text-xs text-muted-foreground">
                 <p className="leading-relaxed">
-                  The agent pipeline processes requests through seven stages. Each agent builds on the previous stage's output.
+                  The agent pipeline processes requests through eight stages. Each agent builds on the previous stage's output.
                 </p>
                 <ul className="space-y-1 list-disc list-inside ml-1">
                   <li><strong>Complexity Detector:</strong> Analyze and classify query complexity</li>
@@ -192,6 +206,7 @@ export function PipelineBanner({ currentAgent, requestId }: PipelineBannerProps)
                   <li><strong>Planner Agent:</strong> Create executable plans from thoughts</li>
                   <li><strong>Critic Agent:</strong> Evaluate plans for errors and completeness</li>
                   <li><strong>Confidence Scorer:</strong> Aggregate confidence scores and make routing decisions</li>
+                  <li><strong>Meta Agent:</strong> Assess reasoning quality and trigger replanning when needed</li>
                   <li><strong>Executor Agent:</strong> Execute plans with error handling and tool coordination</li>
                   <li><strong>Summary Agent:</strong> Generate human-readable summaries from thoughts and execution outputs</li>
                 </ul>

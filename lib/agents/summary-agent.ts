@@ -151,13 +151,15 @@ Format your summary as natural prose, not as structured JSON or bullet points. W
         prompt += `\n`
       }
 
-      if (thought.keyInsights && thought.keyInsights.length > 0) {
-        prompt += `**Key Insights:**\n`
-        thought.keyInsights.forEach(insight => {
-          prompt += `- ${insight}\n`
-        })
-        prompt += `\n`
-      }
+      // Key insights are at the ThoughtAgentOutput level, not individual Thought level
+    }
+
+    if (thoughts.keyInsights && thoughts.keyInsights.length > 0) {
+      prompt += `**Key Insights:**\n`
+      thoughts.keyInsights.forEach((insight: string) => {
+        prompt += `- ${insight}\n`
+      })
+      prompt += `\n`
     }
 
     if (thoughts.primaryApproach) {

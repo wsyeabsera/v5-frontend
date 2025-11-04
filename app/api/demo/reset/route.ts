@@ -38,7 +38,7 @@ export async function POST(req: NextRequest) {
     logger.info('[Demo Reset] All agent outputs and requests cleared')
     
     // Helper function to generate natural language queries from prompt metadata
-    function generateQueryFromPrompt(prompt: MCPPrompt): string {
+    const generateQueryFromPrompt = (prompt: MCPPrompt): string => {
       // Map known prompt names to natural language queries
       const promptQueryMap: Record<string, string> = {
         'analyze-facility-compliance': 'Analyze facility compliance for Hannover facility',

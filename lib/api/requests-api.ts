@@ -307,6 +307,52 @@ export async function getRequestsWithCriticAgent(): Promise<(RequestContext & { 
 }
 
 /**
+ * Get requests with confidence-scorer in their agent chain
+ * 
+ * Returns requests with a metaOutputExists boolean indicating
+ * whether meta output already exists for each request.
+ */
+export async function getRequestsWithConfidenceScorer(): Promise<(RequestContext & { metaOutputExists: boolean })[]> {
+  const response = await fetch(`${API_BASE}/with-confidence-scorer`)
+  
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}))
+    const errorMessage = errorData.error || `Failed to fetch requests: ${response.statusText}`
+    throw new Error(errorMessage)
+  }
+  
+  const data = await response.json()
+  // Convert date strings back to Date objects
+  return data.map((req: any) => ({
+    ...req,
+    createdAt: new Date(req.createdAt),
+  }))
+}
+
+/**
+ * Get requests with meta-agent in their agent chain
+ * 
+ * Returns requests with a replanOutputExists boolean indicating
+ * whether replan output already exists for each request.
+ */
+export async function getRequestsWithMetaAgent(): Promise<(RequestContext & { replanOutputExists: boolean })[]> {
+  const response = await fetch(`${API_BASE}/with-meta-agent`)
+  
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}))
+    const errorMessage = errorData.error || `Failed to fetch requests: ${response.statusText}`
+    throw new Error(errorMessage)
+  }
+  
+  const data = await response.json()
+  // Convert date strings back to Date objects
+  return data.map((req: any) => ({
+    ...req,
+    createdAt: new Date(req.createdAt),
+  }))
+}
+
+/**
  * Initialize MongoDB indexes for requests collection
  */
 export async function initRequests(): Promise<{ message: string }> {

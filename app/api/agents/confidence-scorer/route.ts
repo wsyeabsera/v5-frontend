@@ -68,7 +68,7 @@ export async function POST(req: NextRequest) {
       agentScoresCount: agentScores.length,
     })
 
-    const result = await scorer.scoreConfidence(agentScores, updatedRequestContext)
+    const result = await scorer.scoreConfidence(agentScores, updatedRequestContext, req.headers)
 
     // Store output in MongoDB
     try {

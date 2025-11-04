@@ -1,15 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getRequestMongoDBStorage } from '@/lib/storage/request-mongodb-storage'
-import { getThoughtOutputsStorage } from '@/lib/storage/thought-outputs-storage'
+import { getReplanOutputsStorage } from '@/lib/storage/replan-outputs-storage'
 import { testConnection } from '@/lib/storage/mongodb-client'
 
 /**
- * GET /api/requests/with-complexity-detector
+ * GET /api/requests/with-meta-agent
  * 
- * Get all requests that have complexity-detector in their agent chain.
- * Also includes whether each request already has thought output.
+ * Get all requests that have meta-agent in their agent chain.
+ * Also includes whether each request already has replan output.
  * 
- * Returns: Array of requests with thoughtOutputExists boolean
+ * Returns: Array of requests with replanOutputExists boolean
  */
 export async function GET(req: NextRequest) {
   try {
@@ -34,11 +34,9 @@ export async function GET(req: NextRequest) {
     // Get all requests
     const allRequests = await storage.getAll()
     
-    // Filter for requests that have complexity-detector in their agent chain
-    const filteredRequests = allRequests
-    .filter((r) => r.agentChain && r.agentChain.length > 0)
-    .filter((r) => 
-      r.agentChain.includes('complexity-detector')
+    // Filter for requests that have meta-agent in their agent chain
+    const filteredRequests = allRequests.filter((r) => 
+      r.agentChain && Array.isArray(r.agentChain) && r.agentChain.includes('meta-agent')
     )
     
     // Sort by newest first
@@ -46,21 +44,21 @@ export async function GET(req: NextRequest) {
       new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
     )
     
-    // Check which requests already have thought output
-    const thoughtStorage = getThoughtOutputsStorage()
-    const requestsWithThoughtStatus = await Promise.all(
+    // Check which requests already have replan output
+    const replanStorage = getReplanOutputsStorage()
+    const requestsWithReplanStatus = await Promise.all(
       filteredRequests.map(async (request) => {
-        const thoughtOutput = await thoughtStorage.getByRequestId(request.requestId)
+        const replanOutput = await replanStorage.getLatestByRequestId(request.requestId)
         return {
           ...request,
-          thoughtOutputExists: thoughtOutput !== null,
+          replanOutputExists: replanOutput !== null,
         }
       })
     )
     
-    return NextResponse.json(requestsWithThoughtStatus, { status: 200 })
+    return NextResponse.json(requestsWithReplanStatus, { status: 200 })
   } catch (error: any) {
-    console.error('[Requests API] Error fetching requests with complexity-detector:', error)
+    console.error('[Requests API] Error fetching requests with meta-agent:', error)
     return NextResponse.json(
       { error: error.message || 'Failed to fetch requests' },
       { status: 500 }

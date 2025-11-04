@@ -423,7 +423,7 @@ export default function ComplexityDetectorPage() {
                                 <Clock className="w-3 h-3" />
                                 {new Date(request.createdAt).toLocaleString()}
                               </div>
-                              {request.agentChain.length > 0 && (
+                              {request.agentChain && request.agentChain.length > 0 && (
                                 <div className="flex items-center gap-1">
                                   <span>Chain:</span>
                                   <Badge variant="secondary" className="text-xs">

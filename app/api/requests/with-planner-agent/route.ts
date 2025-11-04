@@ -35,7 +35,9 @@ export async function GET(req: NextRequest) {
     const allRequests = await storage.getAll()
     
     // Filter for requests that have planner-agent in their agent chain
-    const filteredRequests = allRequests.filter((r) => 
+    const filteredRequests = allRequests
+    .filter((r) => r.agentChain && r.agentChain.length > 0)
+    .filter((r) => 
       r.agentChain.includes('planner-agent')
     )
     
