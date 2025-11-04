@@ -1,6 +1,6 @@
 'use client'
 
-import { Home, MessageSquare, Settings, ChevronLeft, ChevronRight, List, Sparkles, Database, Cpu, Brain, GraduationCap, ListChecks, ShieldCheck, Play, ChevronDown, FileText, BarChart, Eye, RotateCcw } from 'lucide-react'
+import { Home, MessageSquare, Settings, ChevronLeft, ChevronRight, List, Sparkles, Database, Cpu, Brain, GraduationCap, ListChecks, ShieldCheck, Play, ChevronDown, FileText, BarChart, Eye, RotateCcw, Zap } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useState, useEffect } from 'react'
@@ -44,6 +44,14 @@ const navigation = [
     items: [
       { name: 'Base Agent', href: '/agents/base-agent', icon: Cpu },
       { name: 'Settings', href: '/settings', icon: Settings },
+    ]
+  },
+  {
+    group: 'Version 2',
+    items: [
+      { name: 'V2 Settings', href: '/v2/settings', icon: Settings },
+      { name: 'AI Execution', href: '/v2/ai-execution', icon: Zap },
+      { name: 'V2 Requests', href: '/v2/requests', icon: FileText },
     ]
   },
 ]
