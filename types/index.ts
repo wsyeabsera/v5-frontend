@@ -546,6 +546,17 @@ export interface ExecutorAgentOutput extends AgentOutput {
 }
 
 /**
+ * Summary Agent Output - Human-readable summary of thoughts and execution
+ */
+export interface SummaryAgentOutput extends AgentOutput {
+  summary: string; // Main human-readable summary text
+  summaryVersion?: number; // For tracking multiple summaries per request
+  thoughtsSummary?: string; // Summary of thoughts used
+  executionSummary?: string; // Summary of execution results
+  keyTakeaways?: string[]; // Key points extracted
+}
+
+/**
  * Tool Recommendation - Individual tool recommendation with priority and rationale
  */
 export interface ToolRecommendation {

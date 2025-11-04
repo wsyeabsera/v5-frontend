@@ -261,6 +261,29 @@ export async function getRequestsWithPlannerAgent(): Promise<(RequestContext & {
 }
 
 /**
+ * Get requests with executor-agent in their agent chain
+ * 
+ * Returns requests with a summaryOutputExists boolean indicating
+ * whether summary output already exists for each request.
+ */
+export async function getRequestsWithExecutorAgent(): Promise<(RequestContext & { summaryOutputExists: boolean })[]> {
+  const response = await fetch(`${API_BASE}/with-executor-agent`)
+  
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}))
+    const errorMessage = errorData.error || `Failed to fetch requests: ${response.statusText}`
+    throw new Error(errorMessage)
+  }
+  
+  const data = await response.json()
+  // Convert date strings back to Date objects
+  return data.map((req: any) => ({
+    ...req,
+    createdAt: new Date(req.createdAt),
+  }))
+}
+
+/**
  * Initialize MongoDB indexes for requests collection
  */
 export async function initRequests(): Promise<{ message: string }> {

@@ -77,6 +77,8 @@ export async function POST(req: NextRequest) {
       ...requestContext,
       userQuery,
       status: 'in-progress',
+      // Ensure agentChain exists and is an array
+      agentChain: requestContext.agentChain || [],
     }
     await requestStorage.save(updatedRequestContext)
 
@@ -191,7 +193,7 @@ export async function POST(req: NextRequest) {
       // Don't fail the request if storage fails
     }
 
-    // Update request context status
+    // Update request context status (result.requestContext already has executor-agent in agentChain from addToChain)
     if (result.executionResult.overallSuccess) {
       result.requestContext.status = 'completed'
     } else if (result.requiresUserFeedback) {
@@ -199,6 +201,12 @@ export async function POST(req: NextRequest) {
     } else {
       result.requestContext.status = 'failed'
     }
+    
+    // Ensure agentChain includes executor-agent (should already be there from addToChain, but double-check)
+    if (!result.requestContext.agentChain.includes('executor-agent')) {
+      result.requestContext.agentChain.push('executor-agent')
+    }
+    
     await requestStorage.save(result.requestContext)
 
     logger.info(`[Executor Agent API] Execution completed`, {
