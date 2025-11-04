@@ -1,0 +1,43 @@
+{
+  "requestId": "b4259b78-ea1b-49e7-aff7-6f0d939a4a1e",
+  "agentName": "planner-agent",
+  "timestamp": "2025-11-03T19:01:05.920Z",
+  "requestContext": {
+    "requestId": "b4259b78-ea1b-49e7-aff7-6f0d939a4a1e",
+    "createdAt": "2025-11-03T19:00:47.332Z",
+    "agentChain": [
+      "complexity-detector",
+      "thought-agent",
+      "planner-agent"
+    ],
+    "status": "completed",
+    "userQuery": "List facilities in New York"
+  },
+  "plan": {
+    "id": "plan-1762196465919",
+    "goal": "List waste management facilities in New York",
+    "steps": [
+      {
+        "id": "step-1",
+        "order": 1,
+        "description": "List facilities in New York",
+        "action": "list_facilities",
+        "parameters": {
+          "location": "New York"
+        },
+        "expectedOutcome": "Retrieve a list of waste management facilities in New York",
+        "dependencies": [],
+        "status": "pending"
+      }
+    ],
+    "estimatedComplexity": 0.3,
+    "confidence": 0.9,
+    "dependencies": [],
+    "createdAt": "2025-11-03T19:01:05.920Z",
+    "planVersion": 1
+  },
+  "rationale": "Plan created based on reasoning thoughts.",
+  "basedOnThoughts": [
+    "thought-1762196452386-1"
+  ]
+}

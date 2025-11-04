@@ -1,0 +1,41 @@
+{
+  "requestId": "354a5ae6-1c7c-4186-b499-3e9c5fe37272",
+  "agentName": "planner-agent",
+  "timestamp": "2025-11-03T18:58:52.747Z",
+  "requestContext": {
+    "requestId": "354a5ae6-1c7c-4186-b499-3e9c5fe37272",
+    "createdAt": "2025-11-03T18:58:32.087Z",
+    "agentChain": [
+      "complexity-detector",
+      "thought-agent",
+      "planner-agent"
+    ],
+    "status": "completed",
+    "userQuery": "Show me all facilities"
+  },
+  "plan": {
+    "id": "plan-1762196332746",
+    "goal": "Retrieve a list of all facilities",
+    "steps": [
+      {
+        "id": "step-1",
+        "order": 1,
+        "description": "List all facilities",
+        "action": "list_facilities",
+        "parameters": {},
+        "expectedOutcome": "Retrieve a comprehensive list of all facilities",
+        "dependencies": [],
+        "status": "pending"
+      }
+    ],
+    "estimatedComplexity": 0.7,
+    "confidence": 0.9,
+    "dependencies": [],
+    "createdAt": "2025-11-03T18:58:52.746Z",
+    "planVersion": 1
+  },
+  "rationale": "Plan created based on reasoning thoughts.",
+  "basedOnThoughts": [
+    "thought-1762196319012-1"
+  ]
+}

@@ -36,11 +36,10 @@ export function RequestList({
       </div>
     )
   }
-
   return (
     <ScrollArea className="h-[calc(100vh-300px)]">
       <div className="space-y-2 pr-4">
-        {requests.map((request) => (
+        {requests && requests.length > 0 && requests.map((request) => (
           <RequestCard
             key={request.requestId}
             request={request}

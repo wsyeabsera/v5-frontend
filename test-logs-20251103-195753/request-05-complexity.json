@@ -1,0 +1,38 @@
+{
+  "requestId": "27798779-75ad-4423-af68-26f3f51498b4",
+  "agentName": "complexity-detector",
+  "timestamp": "2025-11-03T19:02:19.713Z",
+  "requestContext": {
+    "requestId": "27798779-75ad-4423-af68-26f3f51498b4",
+    "createdAt": "2025-11-03T19:02:19.109Z",
+    "agentChain": [
+      "complexity-detector"
+    ],
+    "status": "completed",
+    "userQuery": "Get facility HAN and generate an intelligent report for it with recommendations"
+  },
+  "complexity": {
+    "score": 0.1737,
+    "reasoningPasses": 1,
+    "factors": {
+      "queryLength": 0.158,
+      "hasMultipleQuestions": false,
+      "requiresMultiStep": false,
+      "involvesAnalysis": false,
+      "needsDataAggregation": false,
+      "domainComplexity": 1
+    }
+  },
+  "userQuery": "Get facility HAN and generate an intelligent report for it with recommendations",
+  "detectedKeywords": [
+    "facility",
+    "report",
+    "generate",
+    "intelligent",
+    "recommend",
+    "recommendation"
+  ],
+  "detectionMethod": "keyword",
+  "llmUsed": false,
+  "llmConfidence": 0.7
+}

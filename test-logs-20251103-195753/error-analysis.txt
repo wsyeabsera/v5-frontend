@@ -1,0 +1,13 @@
+=== Detailed Error Analysis ===
+
+1. 'Not available in MCP tools' errors (should be 0):
+test-logs-20251103-195753/test-summary.txt:Checking for 'not available in the MCP tools' errors (should be 0):
+
+2. RequestContext errors:
+  Found: 15 occurrences
+
+3. Successful executions:
+  request-01-executor.json: SUCCESS
+  request-02-executor.json: SUCCESS
+  request-03-executor.json: SUCCESS
+  request-08-executor.json: SUCCESS

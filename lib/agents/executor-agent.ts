@@ -14,9 +14,10 @@
  */
 
 import { BaseAgent } from './base-agent'
-import { Plan, PlanStep, ExecutorAgentOutput, ExecutionResult, ExecutionFollowUpQuestion, PlanExecutionResult, RequestContext, CriticAgentOutput, MCPContext } from '@/types'
+import { Plan, PlanStep, ExecutorAgentOutput, ExecutionResult, ExecutionFollowUpQuestion, PlanExecutionResult, RequestContext, CriticAgentOutput, MCPContext, ToolMemoryOutput, ComplexityScore } from '@/types'
 import { logger } from '@/utils/logger'
-import { listMCPTools } from '@/lib/mcp-prompts'
+import { listMCPTools, listMCPPrompts, getMCPPrompt } from '@/lib/mcp-prompts'
+import { ToolMemoryAgent } from './tool-memory-agent'
 
 /**
  * Server-side MCP tool caller
@@ -139,20 +140,28 @@ Remember: You are outputting JSON only, no text before or after the JSON object.
   }
 
   /**
-   * Fetch MCP context (tools)
+   * Fetch MCP context (tools and prompts)
    */
   async fetchMCPContext(): Promise<MCPContext> {
     try {
-      const tools = await listMCPTools().catch(() => [])
+      const [tools, prompts] = await Promise.all([
+        listMCPTools().catch(() => []),
+        listMCPPrompts().catch(() => []),
+      ])
 
       logger.debug(`[ExecutorAgent] Fetched MCP context`, {
         toolsCount: tools.length,
+        promptsCount: prompts.length,
       })
 
       return {
         tools,
         resources: [],
-        prompts: [],
+        prompts: prompts.map(p => ({
+          name: p.name,
+          description: p.description,
+          arguments: p.arguments || [],
+        })),
       }
     } catch (error: any) {
       logger.error(`[ExecutorAgent] Failed to fetch MCP context:`, error)
@@ -161,19 +170,109 @@ Remember: You are outputting JSON only, no text before or after the JSON object.
   }
 
   /**
+   * Fetch tool recommendations from Tool Memory Agent
+   * 
+   * @param userQuery - Original user query
+   * @param requestContext - Request context
+   * @param complexityScore - Optional complexity score
+   * @returns Tool recommendations or null if unavailable
+   */
+  private async fetchToolRecommendations(
+    userQuery: string,
+    requestContext: RequestContext,
+    complexityScore?: ComplexityScore
+  ): Promise<ToolMemoryOutput | null> {
+    try {
+      const toolMemoryAgent = new ToolMemoryAgent()
+      
+      // Try to initialize (may fail if not configured)
+      try {
+        await toolMemoryAgent.initialize()
+      } catch (error: any) {
+        logger.debug(`[ExecutorAgent] Tool Memory Agent not available:`, error.message)
+        return null
+      }
+
+      const mcpContext = await this.fetchMCPContext()
+      const recommendations = await toolMemoryAgent.recommendTools(
+        userQuery,
+        requestContext,
+        complexityScore,
+        mcpContext
+      )
+
+      logger.debug(`[ExecutorAgent] Fetched tool recommendations`, {
+        toolsRecommended: recommendations.recommendedTools.length,
+      })
+
+      return recommendations
+    } catch (error: any) {
+      logger.warn(`[ExecutorAgent] Failed to fetch tool recommendations:`, error.message)
+      return null
+    }
+  }
+
+  /**
+   * Validate that a tool/prompt name exists in MCP context
+   * 
+   * @param actionName - Name of the tool/prompt to validate
+   * @param mcpContext - MCP context with available tools and prompts
+   * @returns true if action exists (either as tool or prompt)
+   */
+  private validateToolOrPrompt(actionName: string, mcpContext: MCPContext): boolean {
+    const toolExists = mcpContext.tools.some(t => t.name === actionName)
+    const promptExists = mcpContext.prompts.some(p => p.name === actionName)
+    return toolExists || promptExists
+  }
+
+  /**
    * Execute a complete plan
    * 
    * Main entry point for plan execution. Handles dependency resolution,
    * step execution loop, error handling, and state management.
+   * 
+   * @param plan - Plan to execute
+   * @param requestContext - Request context
+   * @param critique - Optional critique from Critic Agent
+   * @param userFeedback - Optional user responses
+   * @param userQuery - Original user query (for tool recommendations)
+   * @param toolRecommendations - Optional tool recommendations (will be fetched if not provided)
+   * @param complexityScore - Optional complexity score for tool recommendations
    */
   async executePlan(
     plan: Plan,
     requestContext: RequestContext,
     critique?: CriticAgentOutput,
-    userFeedback?: { questionId: string; answer: string }[]
+    userFeedback?: { questionId: string; answer: string }[],
+    userQuery?: string,
+    toolRecommendations?: ToolMemoryOutput,
+    complexityScore?: ComplexityScore
   ): Promise<ExecutorAgentOutput> {
     // Step 1: Add this agent to the request chain
     const updatedContext = this.addToChain(requestContext)
+
+    // Step 1.5: Fetch MCP context and validate plan against both tools AND prompts
+    const mcpContext = await this.fetchMCPContext()
+    
+    // Validate all steps before execution
+    for (const step of plan.steps) {
+      // Skip validation for manual actions
+      if (step.action.toLowerCase().includes('manual') || step.action === 'unknown') {
+        continue
+      }
+      
+      if (!this.validateToolOrPrompt(step.action, mcpContext)) {
+        throw new Error(`The plan includes an action '${step.action}' that is not available in the MCP tools or prompts. Available tools: ${mcpContext.tools.map((t: any) => t.name).join(', ')}, Available prompts: ${mcpContext.prompts.map((p: any) => p.name).join(', ')}`)
+      }
+    }
+
+    // Step 1.6: Fetch tool recommendations if not provided and userQuery is available
+    let toolRecs = toolRecommendations
+    if (!toolRecs && userQuery) {
+      // Extract complexity from request context if available
+      const complexity = complexityScore || ((requestContext as any).metadata?.complexity as ComplexityScore | undefined)
+      toolRecs = await this.fetchToolRecommendations(userQuery, updatedContext, complexity) || undefined
+    }
 
     // Step 2: Check critique recommendation
     if (critique) {
@@ -440,11 +539,39 @@ Remember: You are outputting JSON only, no text before or after the JSON object.
       })
     }
 
+    // Check if this is a prompt/workflow template or a tool
+    // Fetch MCP context to check if action is a prompt or tool
+    const mcpContextForCheck = await this.fetchMCPContext()
+    const isPrompt = mcpContextForCheck.prompts?.some(p => p.name === actionToUse) || false
+    const isTool = mcpContextForCheck.tools.some(t => t.name === actionToUse)
+
     // Execute with retries
     while (retries < this.MAX_RETRIES) {
       try {
-        // Call the tool (server-side)
-        const result = await callMCPToolServer(actionToUse, coordinatedParams)
+        // Call prompt or tool based on what the action is
+        let result: any
+        if (isPrompt) {
+          // This is a prompt/workflow template - call getMCPPrompt
+          logger.info(`[ExecutorAgent] Executing prompt: ${actionToUse}`, {
+            stepId: step.id,
+            stepOrder: step.order,
+            parameters: coordinatedParams,
+          })
+          
+          const promptResult = await getMCPPrompt(actionToUse, coordinatedParams)
+          
+          // Prompts may return tool calls or direct results
+          result = {
+            message: 'Prompt executed successfully',
+            tools: [actionToUse],
+            result: promptResult,
+          }
+        } else if (isTool) {
+          // This is a tool - call callMCPToolServer
+          result = await callMCPToolServer(actionToUse, coordinatedParams)
+        } else {
+          throw new Error(`Action "${actionToUse}" is neither a tool nor a prompt. Available tools: ${mcpContextForCheck.tools.map((t: any) => t.name).join(', ') || 'none'}, Available prompts: ${mcpContextForCheck.prompts?.map((p: any) => p.name).join(', ') || 'none'}`)
+        }
 
         const duration = Date.now() - startTime
 

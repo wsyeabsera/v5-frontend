@@ -1,0 +1,35 @@
+{
+  "requestId": "783fcaf2-fc86-4ed3-9943-341cd505d160",
+  "agentName": "complexity-detector",
+  "timestamp": "2025-11-03T19:05:28.698Z",
+  "requestContext": {
+    "requestId": "783fcaf2-fc86-4ed3-9943-341cd505d160",
+    "createdAt": "2025-11-03T19:05:27.981Z",
+    "agentChain": [
+      "complexity-detector"
+    ],
+    "status": "completed",
+    "userQuery": "List all inspections"
+  },
+  "complexity": {
+    "score": 0.216,
+    "reasoningPasses": 1,
+    "factors": {
+      "queryLength": 0.04,
+      "hasMultipleQuestions": false,
+      "requiresMultiStep": false,
+      "involvesAnalysis": false,
+      "needsDataAggregation": true,
+      "domainComplexity": 0.4
+    }
+  },
+  "userQuery": "List all inspections",
+  "detectedKeywords": [
+    "all",
+    "inspection",
+    "inspections"
+  ],
+  "detectionMethod": "keyword",
+  "llmUsed": false,
+  "llmConfidence": 0.7
+}

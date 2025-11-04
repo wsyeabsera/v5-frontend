@@ -226,6 +226,7 @@ export interface AgentParameters {
   temperature?: number; // 0-1, controls randomness
   maxTokens?: number; // Maximum tokens in response
   topP?: number; // 0-1, nucleus sampling parameter
+  forceCompression?: boolean; // Force compression of prompts even if under token limit
   [key: string]: any; // Extensible for agent-specific params
 }
 
@@ -296,6 +297,7 @@ export interface ThoughtAgentOutput extends AgentOutput {
   primaryApproach: string; // The main approach identified
   keyInsights: string[]; // Key insights extracted
   recommendedTools: string[]; // Tools that might be useful
+  recommendedPrompts?: string[]; // MCP prompts that might be useful
   complexityScore?: number; // From Complexity Detector
   reasoningPass?: number; // Which pass this is (1, 2, or 3)
   totalPasses?: number; // Total passes planned

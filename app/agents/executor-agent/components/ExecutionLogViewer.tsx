@@ -161,7 +161,7 @@ export function ExecutionLogViewer({
       logs.push({
         id: `error-${idx}`,
         type: 'error',
-        timestamp: executionResult.timestamp,
+        timestamp: new Date(executionResult.timestamp),
         message: error,
         icon: <AlertTriangle className="w-4 h-4" />,
         color: 'text-red-600 dark:text-red-400',
@@ -173,7 +173,7 @@ export function ExecutionLogViewer({
       logs.push({
         id: `question-${question.id}`,
         type: 'question',
-        timestamp: executionResult.timestamp,
+        timestamp: new Date(executionResult.timestamp),
         stepId: question.context.stepId,
         stepOrder: question.context.stepOrder,
         message: `Question asked: ${question.question}`,

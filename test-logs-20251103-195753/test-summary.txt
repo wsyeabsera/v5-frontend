@@ -1,0 +1,54 @@
+=== Starting Test Pipeline ===
+Test started at: Mon Nov  3 19:58:21 CET 2025
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Request 1/42: Show me all facilities
+Request ID: test-1762196308-001
+
+Request 1 completed successfully: true
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Request 2/42: List all contracts
+
+Request 2 completed: Success=true
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Request 3/42: List facilities in New York
+
+Request 3 completed: Success=true
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Request 4/42: Get details for facility HAN
+
+Request 4 completed: Success=false
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Request 5/42: Get facility HAN and generate an intelligent report for it with recommendations
+
+Request 6: List contaminants and get details for the first one
+Request 7: Get inspection details for facility HAN
+Request 8: Get shipment with license plate ABC-123
+  Result: true
+Request 9: Get contract for producer Green Industries Inc
+  Result: requestContext with requestId is required
+Request 10: Update facility HAN location to Amsterdam, Netherlands
+  Result: requestContext with requestId is required
+Request 11: List contaminants and update the first one's explosive level to low
+  Result: requestContext with requestId is required
+Request 12: List facilities, get the first one's details, and analyze its shipment risks
+  Result: requestContext with requestId is required
+Request 13: List all shipments and analyze the risk of shipments from Green Industries Inc
+  Result: requestContext with requestId is required
+Request 14: Create a new contaminant for facility HAN with high explosive level, medium HCl level, and medium SO2 level
+  Result: requestContext with requestId is required
+Request 15: Create an inspection for facility AMS
+  Result: requestContext with requestId is required
+Completed requests 6-15
+Test completed at: Mon Nov  3 20:05:37 CET 2025
+
+=== Summary Statistics ===
+Total requests tested:       12
+Successful executions:        1
+Requests with errors:        8
+
+=== Key Verification: Tool Memory Agent Integration ===
+Checking for 'not available in the MCP tools' errors (should be 0):
+Found:        1 (should be 0)
+
+=== Test Results ===

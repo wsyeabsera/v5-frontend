@@ -1,0 +1,8 @@
+{
+  "message": "Tool memory initialized successfully",
+  "toolsMetadataSeeded": 28,
+  "promptsMetadataSeeded": 13,
+  "usageExamplesSeeded": 40,
+  "totalExamples": 81,
+  "deletedCount": 81
+}

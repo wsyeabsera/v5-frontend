@@ -3,6 +3,7 @@ import { PlannerAgent } from '@/lib/agents/planner-agent'
 import { getPlannerOutputsStorage } from '@/lib/storage/planner-outputs-storage'
 import { getAgentConfigStorage } from '@/lib/storage/agent-config-storage'
 import { getRequestMongoDBStorage } from '@/lib/storage/request-mongodb-storage'
+import { getThoughtOutputsStorage } from '@/lib/storage/thought-outputs-storage'
 import { AgentConfig, RequestContext, Thought } from '@/types'
 import { logger } from '@/utils/logger'
 
@@ -92,17 +93,27 @@ export async function POST(req: NextRequest) {
       ? Math.max(...existingPlans.map(p => p.plan?.planVersion || 1)) + 1
       : 1
 
+    // Fetch ThoughtAgentOutput to get recommendedPrompts
+    const thoughtOutputsStorage = getThoughtOutputsStorage()
+    const thoughtOutput = await thoughtOutputsStorage.getByRequestId(requestContext.requestId)
+
     logger.info(`[Planner Agent API] Generating plan`, {
       requestId: requestContext.requestId,
       thoughtsCount: thoughts.length,
       queryLength: userQuery.length,
       planVersion: nextPlanVersion,
+      hasRecommendedPrompts: !!(thoughtOutput?.recommendedPrompts && thoughtOutput.recommendedPrompts.length > 0),
     })
 
     const result = await agent.generatePlan(
       thoughts,
       userQuery,
-      updatedRequestContext
+      updatedRequestContext,
+      undefined, // mcpContext - will be fetched
+      undefined, // similarExamples - will be fetched
+      undefined, // toolRecommendations - will be fetched
+      undefined, // complexityScore
+      thoughtOutput || undefined // thoughtOutput with recommendedPrompts
     )
 
     // Set plan version after generation

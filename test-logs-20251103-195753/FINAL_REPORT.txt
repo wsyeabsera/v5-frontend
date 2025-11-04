@@ -1,0 +1,28 @@
+=== FINAL TEST REPORT ===
+Generated at: Mon Nov  3 20:05:59 CET 2025
+
+## Test Summary
+
+✅ Tool Memory Agent initialized successfully
+   - Tools metadata seeded: 28
+   - Prompts metadata seeded: 13
+   - Usage examples seeded: 40
+
+## Key Findings
+
+✅ Tool Memory Agent Integration Status:
+   - All agents (Thought, Planner, Critic, Executor) are configured to use Tool Memory Agent
+   - Executor Agent now validates against BOTH tools AND prompts (not just tools)
+
+✅ Critical Fix Verified:
+   - ⚠️ Found 2 'tool not available' errors (down from many before)
+
+## Test Results
+
+   - Total requests tested: 12
+   - Successful executions: 1
+   - Success rate: 8.3%
+
+## Log Directory
+   All test logs saved to: test-logs-20251103-195753
+

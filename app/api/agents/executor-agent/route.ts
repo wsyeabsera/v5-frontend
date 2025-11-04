@@ -5,7 +5,7 @@ import { getPlannerOutputsStorage } from '@/lib/storage/planner-outputs-storage'
 import { getCriticOutputsStorage } from '@/lib/storage/critic-outputs-storage'
 import { getAgentConfigStorage } from '@/lib/storage/agent-config-storage'
 import { getRequestMongoDBStorage } from '@/lib/storage/request-mongodb-storage'
-import { RequestContext, Plan, ExecutorAgentOutput, CriticAgentOutput } from '@/types'
+import { RequestContext, Plan, ExecutorAgentOutput, CriticAgentOutput, AgentConfig } from '@/types'
 import { logger } from '@/utils/logger'
 
 /**
@@ -166,7 +166,8 @@ export async function POST(req: NextRequest) {
       planToExecute,
       updatedRequestContext,
       critique,
-      userFeedback
+      userFeedback,
+      userQuery
     )
 
     // Store output in MongoDB
@@ -220,35 +221,102 @@ export async function POST(req: NextRequest) {
 }
 
 /**
- * GET endpoint - returns execution by requestId
+ * GET endpoint - returns agent config or execution by requestId
  */
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url)
     const requestId = searchParams.get('requestId')
 
-    if (!requestId) {
-      return NextResponse.json(
-        { error: 'requestId query parameter is required' },
-        { status: 400 }
-      )
+    // If requestId is provided, return execution
+    if (requestId) {
+      const storage = getExecutorOutputsStorage()
+      const output = await storage.getByRequestId(requestId)
+
+      if (!output) {
+        return NextResponse.json(
+          { error: 'Execution not found for this request' },
+          { status: 404 }
+        )
+      }
+
+      return NextResponse.json(output, { status: 200 })
     }
 
-    const storage = getExecutorOutputsStorage()
-    const output = await storage.getByRequestId(requestId)
+    // Otherwise, return agent config
+    const storage = getAgentConfigStorage()
+    const config = await storage.getAgentConfig('executor-agent')
 
-    if (!output) {
+    if (!config) {
       return NextResponse.json(
-        { error: 'Execution not found for this request' },
+        { error: 'Agent config not found' },
         { status: 404 }
       )
     }
 
-    return NextResponse.json(output, { status: 200 })
+    return NextResponse.json({ config }, { status: 200 })
   } catch (error: any) {
     logger.error(`[Executor Agent API] GET error:`, error.message, error)
     return NextResponse.json(
       { error: error.message || 'Failed to fetch execution' },
+      { status: 500 }
+    )
+  }
+}
+
+/**
+ * PUT endpoint - updates agent config
+ */
+export async function PUT(req: NextRequest) {
+  try {
+    const body = await req.json()
+    const config: AgentConfig = body
+
+    // Ensure agentId is executor-agent
+    config.agentId = 'executor-agent'
+
+    const storage = getAgentConfigStorage()
+    const success = await storage.saveAgentConfig(config)
+
+    if (!success) {
+      return NextResponse.json(
+        { error: 'Failed to update agent config' },
+        { status: 500 }
+      )
+    }
+
+    // Return the updated config
+    const updatedConfig = await storage.getAgentConfig('executor-agent')
+    return NextResponse.json({ config: updatedConfig }, { status: 200 })
+  } catch (error: any) {
+    logger.error(`[Executor Agent API] PUT error:`, error.message, error)
+    return NextResponse.json(
+      { error: error.message || 'Failed to update agent config' },
+      { status: 500 }
+    )
+  }
+}
+
+/**
+ * DELETE endpoint - deletes agent config
+ */
+export async function DELETE() {
+  try {
+    const storage = getAgentConfigStorage()
+    const success = await storage.deleteAgentConfig('executor-agent')
+
+    if (!success) {
+      return NextResponse.json(
+        { error: 'Failed to delete agent config' },
+        { status: 500 }
+      )
+    }
+
+    return NextResponse.json({ success: true }, { status: 200 })
+  } catch (error: any) {
+    logger.error(`[Executor Agent API] DELETE error:`, error.message, error)
+    return NextResponse.json(
+      { error: error.message || 'Failed to delete agent config' },
       { status: 500 }
     )
   }

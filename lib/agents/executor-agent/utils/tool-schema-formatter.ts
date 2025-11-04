@@ -8,15 +8,19 @@
 import { MCPContext } from '@/types'
 
 /**
- * Format MCP tools for LLM prompt context
+ * Format MCP tools and prompts for LLM prompt context
  */
 export function formatMCPToolsForPrompt(mcpContext?: MCPContext): string {
-  if (!mcpContext || !mcpContext.tools || mcpContext.tools.length === 0) {
+  if (!mcpContext) {
     return ''
   }
 
-  let formatted = '\n## Available MCP Tools\n\n'
-  formatted += `There are ${mcpContext.tools.length} tools available. Each tool has specific parameter requirements.\n\n`
+  let formatted = ''
+
+  // Format tools
+  if (mcpContext.tools && mcpContext.tools.length > 0) {
+    formatted += '\n## Available MCP Tools\n\n'
+    formatted += `There are ${mcpContext.tools.length} tools available. Each tool has specific parameter requirements.\n\n`
 
   for (const tool of mcpContext.tools) {
     formatted += `### ${tool.name}\n`
@@ -55,12 +59,44 @@ export function formatMCPToolsForPrompt(mcpContext?: MCPContext): string {
     }
   }
 
-  formatted += '## Tool Usage Guidelines\n\n'
-  formatted += '1. Always use EXACT parameter names from tool schemas above\n'
-  formatted += '2. All REQUIRED parameters must be provided\n'
-  formatted += '3. Parameter types must match schema (string, number, boolean, etc.)\n'
-  formatted += '4. If a tool requires an ID parameter, check if lookup tools exist to resolve names to IDs\n'
-  formatted += '5. Discover tool relationships dynamically from names and descriptions\n'
+    formatted += '## Tool Usage Guidelines\n\n'
+    formatted += '1. Always use EXACT parameter names from tool schemas above\n'
+    formatted += '2. All REQUIRED parameters must be provided\n'
+    formatted += '3. Parameter types must match schema (string, number, boolean, etc.)\n'
+    formatted += '4. If a tool requires an ID parameter, check if lookup tools exist to resolve names to IDs\n'
+    formatted += '5. Discover tool relationships dynamically from names and descriptions\n'
+  }
+
+  // Format prompts/workflow templates
+  if (mcpContext.prompts && mcpContext.prompts.length > 0) {
+    formatted += '\n## Available Workflow Templates (MCP Prompts)\n\n'
+    formatted += `There are ${mcpContext.prompts.length} workflow templates available. These are pre-built analysis workflows.\n\n`
+    
+    for (const prompt of mcpContext.prompts) {
+      formatted += `### ${prompt.name}\n`
+      formatted += `${prompt.description || 'No description available'}\n\n`
+      
+      if (prompt.arguments && prompt.arguments.length > 0) {
+        formatted += 'Arguments:\n'
+        for (const arg of prompt.arguments) {
+          const requiredMark = arg.required ? ' ⚠️ REQUIRED' : ' (optional)'
+          formatted += `  • **${arg.name}**${requiredMark}\n`
+          if (arg.description) {
+            formatted += `    - Description: ${arg.description}\n`
+          }
+          formatted += '\n'
+        }
+      } else {
+        formatted += 'No arguments required.\n\n'
+      }
+    }
+    
+    formatted += '## Prompt Usage Guidelines\n\n'
+    formatted += '1. Prompts are workflow templates that may call multiple tools internally\n'
+    formatted += '2. Use prompt names exactly as shown above\n'
+    formatted += '3. Provide all required arguments when calling a prompt\n'
+    formatted += '4. Prompts return analysis results, not raw tool outputs\n\n'
+  }
 
   return formatted
 }

@@ -64,7 +64,7 @@ export function AgentConfigCard({ config, onSave, onDelete, isSaving, isDeleting
     setHasChanges(true)
   }
 
-  const handleParameterChange = (key: string, value: number) => {
+  const handleParameterChange = (key: string, value: number | boolean) => {
     setLocalConfig({
       ...localConfig,
       parameters: { ...localConfig.parameters, [key]: value }
@@ -267,6 +267,27 @@ export function AgentConfigCard({ config, onSave, onDelete, isSaving, isDeleting
           <p className="text-xs text-muted-foreground">
             Nucleus sampling parameter. Controls diversity of output
           </p>
+        </div>
+
+        {/* Force Compression */}
+        <div className="space-y-3 pt-2 border-t border-border/40">
+          <div className="flex items-center justify-between">
+            <div className="flex-1">
+              <label className="text-sm font-medium">Force Compression</label>
+              <p className="text-xs text-muted-foreground mt-1">
+                Always compress prompts to reduce token usage, even if under limit. Useful for models with strict limits.
+              </p>
+            </div>
+            <label className="relative inline-flex items-center cursor-pointer">
+              <input
+                type="checkbox"
+                checked={localConfig.parameters.forceCompression || false}
+                onChange={(e) => handleParameterChange('forceCompression', e.target.checked)}
+                className="sr-only peer"
+              />
+              <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+            </label>
+          </div>
         </div>
       </div>
 

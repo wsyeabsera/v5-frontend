@@ -1,0 +1,34 @@
+{
+  "requestId": "354a5ae6-1c7c-4186-b499-3e9c5fe37272",
+  "agentName": "complexity-detector",
+  "timestamp": "2025-11-03T18:58:34.487Z",
+  "requestContext": {
+    "requestId": "354a5ae6-1c7c-4186-b499-3e9c5fe37272",
+    "createdAt": "2025-11-03T18:58:32.087Z",
+    "agentChain": [
+      "complexity-detector"
+    ],
+    "status": "completed",
+    "userQuery": "Show me all facilities"
+  },
+  "complexity": {
+    "score": 0.1866,
+    "reasoningPasses": 1,
+    "factors": {
+      "queryLength": 0.044,
+      "hasMultipleQuestions": false,
+      "requiresMultiStep": false,
+      "involvesAnalysis": false,
+      "needsDataAggregation": true,
+      "domainComplexity": 0.2
+    }
+  },
+  "userQuery": "Show me all facilities",
+  "detectedKeywords": [
+    "all",
+    "facilities"
+  ],
+  "detectionMethod": "keyword",
+  "llmUsed": false,
+  "llmConfidence": 0.7
+}

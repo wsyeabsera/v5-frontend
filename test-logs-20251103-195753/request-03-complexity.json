@@ -1,0 +1,33 @@
+{
+  "requestId": "b4259b78-ea1b-49e7-aff7-6f0d939a4a1e",
+  "agentName": "complexity-detector",
+  "timestamp": "2025-11-03T19:00:48.014Z",
+  "requestContext": {
+    "requestId": "b4259b78-ea1b-49e7-aff7-6f0d939a4a1e",
+    "createdAt": "2025-11-03T19:00:47.332Z",
+    "agentChain": [
+      "complexity-detector"
+    ],
+    "status": "completed",
+    "userQuery": "List facilities in New York"
+  },
+  "complexity": {
+    "score": 0.038099999999999995,
+    "reasoningPasses": 1,
+    "factors": {
+      "queryLength": 0.054,
+      "hasMultipleQuestions": false,
+      "requiresMultiStep": false,
+      "involvesAnalysis": false,
+      "needsDataAggregation": false,
+      "domainComplexity": 0.2
+    }
+  },
+  "userQuery": "List facilities in New York",
+  "detectedKeywords": [
+    "facilities"
+  ],
+  "detectionMethod": "keyword",
+  "llmUsed": false,
+  "llmConfidence": 0.7
+}

@@ -1,0 +1,41 @@
+{
+  "requestId": "5d34302f-d8c7-4191-8b37-42ee316baac6",
+  "agentName": "planner-agent",
+  "timestamp": "2025-11-03T19:00:35.115Z",
+  "requestContext": {
+    "requestId": "5d34302f-d8c7-4191-8b37-42ee316baac6",
+    "createdAt": "2025-11-03T19:00:18.132Z",
+    "agentChain": [
+      "complexity-detector",
+      "thought-agent",
+      "planner-agent"
+    ],
+    "status": "completed",
+    "userQuery": "List all contracts"
+  },
+  "plan": {
+    "id": "plan-1762196435114",
+    "goal": "List all contracts",
+    "steps": [
+      {
+        "id": "step-1",
+        "order": 1,
+        "description": "Retrieve all contracts",
+        "action": "list_contracts",
+        "parameters": {},
+        "expectedOutcome": "Retrieve a comprehensive list of all contracts in the system",
+        "dependencies": [],
+        "status": "pending"
+      }
+    ],
+    "estimatedComplexity": 0.2,
+    "confidence": 1,
+    "dependencies": [],
+    "createdAt": "2025-11-03T19:00:35.114Z",
+    "planVersion": 1
+  },
+  "rationale": "Plan created based on reasoning thoughts.",
+  "basedOnThoughts": [
+    "thought-1762196422771-1"
+  ]
+}

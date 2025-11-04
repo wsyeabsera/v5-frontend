@@ -13,8 +13,19 @@ import { getAgentConfigStorage } from '@/lib/storage/agent-config-storage'
 import { resolveApiConfig, ApiConfig } from '@/lib/services/api-config-resolver'
 import { addAgentToChain } from '@/lib/utils/request-id'
 import { logger } from '@/utils/logger'
+import { countTokensInMessages, Message, getTokenBreakdown, estimateTokenCount } from '@/lib/utils/token-counter'
+import { contextCompressor, CompressionConfig } from '@/lib/utils/context-compressor'
 
 const AI_SERVER_URL = process.env.AI_SERVER_URL || 'http://localhost:3002/stream'
+
+// Default token limits per provider (safety margin below actual limits)
+const DEFAULT_TOKEN_LIMITS: Record<string, number> = {
+  groq: 9000,       // Groq limit is 12000, use 9000 for safety (25% buffer)
+  anthropic: 190000, // Claude limit is 200000, use 190000 for safety
+  openai: 4000,     // GPT-4 limit varies, use 4000 for safety
+  google: 30000,    // Gemini limit is high, use 30000 for safety
+  ollama: 4000,     // Local models vary, use 4000 for safety
+}
 
 export abstract class BaseAgent {
   protected agentId: string
@@ -59,6 +70,19 @@ export abstract class BaseAgent {
   }
 
   /**
+   * Get token limit for the current provider
+   */
+  private async getTokenLimit(): Promise<number> {
+    if (!this.apiConfig) {
+      return DEFAULT_TOKEN_LIMITS.groq // Default fallback
+    }
+
+    const { getProviderForModel } = await import('@/lib/ai-config')
+    const provider = getProviderForModel(this.apiConfig.modelId)
+    return DEFAULT_TOKEN_LIMITS[provider] || DEFAULT_TOKEN_LIMITS.groq
+  }
+
+  /**
    * Call LLM with messages - handles streaming response
    * 
    * @param messages - Array of system/user/assistant messages
@@ -82,23 +106,103 @@ export abstract class BaseAgent {
     // This ensures the AI server gets the correct model identifier
     const modelIdToSend = this.apiConfig.actualModelName || this.apiConfig.modelId
 
-    logger.debug(`[BaseAgent] Calling LLM for agent '${this.agentId}'`, {
-      modelId: modelIdToSend,
-      originalModelId: this.apiConfig.modelId,
-      messageCount: messages.length,
-      responseFormat: options.responseFormat?.type
-    })
-
     // Get provider for the model to help AI server identify it correctly
     const { getProviderForModel } = await import('@/lib/ai-config')
     const provider = getProviderForModel(this.apiConfig.modelId)
+    const isGroq = provider === 'groq'
+
+    // Convert messages to the format expected by token counter
+    const messagesForCounting: Message[] = messages.map(msg => ({
+      role: msg.role,
+      content: msg.content
+    }))
+
+    // Count tokens before compression
+    const originalTokenCount = countTokensInMessages(messagesForCounting)
+    const tokenLimit = await this.getTokenLimit()
+    const forceCompression = this.agentConfig?.parameters?.forceCompression || false
+
+    // For Groq, compress if we're over 75% of limit (to be very safe)
+    // This accounts for token estimation being potentially lower than actual
+    // For others, compress only if over limit
+    const compressionThreshold = isGroq ? Math.floor(tokenLimit * 0.75) : tokenLimit
+
+    logger.debug(`[BaseAgent] Token count before compression`, {
+      agentId: this.agentId,
+      originalTokenCount,
+      tokenLimit,
+      compressionThreshold,
+      forceCompression,
+      isGroq,
+      modelId: modelIdToSend
+    })
+
+    // Apply compression if needed
+    let finalMessages = messages
+    let compressionApplied = false
+    let compressionActions: string[] = []
+
+    if (originalTokenCount > compressionThreshold || forceCompression) {
+      logger.info(`[BaseAgent] Applying compression`, {
+        agentId: this.agentId,
+        originalTokenCount,
+        tokenLimit,
+        compressionThreshold,
+        forceCompression,
+        reason: originalTokenCount > compressionThreshold ? 'over_threshold' : 'forced'
+      })
+
+      // Compress messages - use compressionThreshold as the target, not tokenLimit
+      // This ensures we compress enough to stay well under the actual limit
+      const compressionResult = contextCompressor.compressMessages(
+        messagesForCounting,
+        compressionThreshold, // Use threshold, not full limit
+        forceCompression
+      )
+
+      // Convert back to original format
+      finalMessages = compressionResult.messages.map(msg => ({
+        role: msg.role as 'system' | 'user' | 'assistant',
+        content: msg.content
+      }))
+
+      compressionApplied = true
+      compressionActions = compressionResult.actions
+
+      logger.info(`[BaseAgent] Compression applied`, {
+        agentId: this.agentId,
+        originalTokenCount,
+        compressedTokenCount: compressionResult.compressedTokenCount,
+        compressionRatio: compressionResult.compressionRatio.toFixed(2),
+        actions: compressionActions,
+        warning: compressionResult.compressionRatio < 0.7 ? 'Aggressive compression may reduce intelligence' : undefined
+      })
+      
+      // Warn if compression is too aggressive
+      if (compressionResult.compressionRatio < 0.7) {
+        logger.warn(`[BaseAgent] Aggressive compression detected - may impact intelligence`, {
+          agentId: this.agentId,
+          compressionRatio: compressionResult.compressionRatio.toFixed(2),
+          actions: compressionActions
+        })
+      }
+    }
+
+    logger.debug(`[BaseAgent] Calling LLM for agent '${this.agentId}'`, {
+      modelId: modelIdToSend,
+      originalModelId: this.apiConfig.modelId,
+      messageCount: finalMessages.length,
+      responseFormat: options.responseFormat?.type,
+      compressionApplied,
+      finalTokenCount: compressionApplied ? countTokensInMessages(finalMessages.map(m => ({ role: m.role, content: m.content }))) : originalTokenCount
+    })
 
     const requestBody: any = {
-      messages,
+      messages: finalMessages,
       modelId: modelIdToSend,
       provider: provider, // Include provider to help AI server resolve the model
       apiKey: this.apiConfig.apiKey,
-      systemPrompt: messages.find(m => m.role === 'system')?.content,
+      systemPrompt: finalMessages.find(m => m.role === 'system')?.content,
       temperature: options.temperature ?? this.apiConfig.temperature,
       maxTokens: options.maxTokens ?? this.apiConfig.maxTokens,
       topP: options.topP ?? this.apiConfig.topP,
@@ -127,7 +231,8 @@ export abstract class BaseAgent {
     
     logger.debug(`[BaseAgent] LLM response received`, {
       agentId: this.agentId,
-      responseLength: fullText.length
+      responseLength: fullText.length,
+      compressionApplied
     })
 
     return fullText.trim()

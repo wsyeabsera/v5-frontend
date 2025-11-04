@@ -8,6 +8,7 @@ import { CoordinationResult, StepExecutionContext } from '../types'
 import { logger } from '@/utils/logger'
 import { formatMCPToolsForPrompt, findToolByName, getToolParameters, detectLookupFlow, isValidMongoDBObjectId, formatArrayResultsForExtraction } from '../utils/tool-schema-formatter'
 import { createInternalAgent, InternalLLMAgent } from '../utils/internal-llm-agent'
+import { validateToolParameters } from '../adapters/mcp-tool-adapter'
 
 export class Coordinator {
   private agent: InternalLLMAgent
@@ -24,16 +25,21 @@ You understand:
 - What data is available from previous steps
 - How to intelligently extract and transform data
 - Available MCP tools and their exact parameter requirements (from tool schemas below)
+- Available MCP prompts/workflow templates and their exact argument requirements (from prompt schemas below)
+- When step action is a prompt, extract arguments the same way as tool parameters
 
 When analyzing a step:
 1. Understand what the step is trying to accomplish (semantic understanding)
-2. Identify what parameters are needed by checking the tool's schema (REQUIRED vs optional)
+2. Identify what parameters/arguments are needed by checking the tool's or prompt's schema (REQUIRED vs optional)
 3. Determine if data can be extracted from previous step results
-4. If a tool requires an ID parameter but you have a name/value, discover lookup tools from available MCP tools
+4. If a tool/prompt requires an ID parameter but you have a name/value, discover lookup tools from available MCP tools
 5. Provide alternatives if data isn't available
 6. Make intelligent recommendations about how to proceed
 
-CRITICAL: Use EXACT parameter names from tool schemas. Do not invent parameter names.
+CRITICAL: Use EXACT parameter/argument names from tool/prompt schemas. Do not invent parameter names.
+- For tools: Use parameter names exactly as shown in tool schema
+- For prompts: Use argument names exactly as shown in prompt schema (e.g., "shipmentId" not "shipment_id")
+- Extraction works the same way for prompts as for tools - extract _id from previous step results and map to required argument name
 
 Respond with JSON only:
 {
@@ -46,10 +52,13 @@ Respond with JSON only:
   "recommendation": "proceed|adapt|ask-user"
 }
 
-CRITICAL: In "parameters" and "extractedValues", only include fields that exist in the tool schema. 
-If the tool requires 'id', extract the FULL '_id' value from the matching array item (the complete 24-character MongoDB ObjectId).
-DO NOT add fields like 'facilityName', 'name', etc. unless they are in the tool schema.
+CRITICAL: In "parameters" and "extractedValues", only include fields that exist in the tool or prompt schema. 
+- For tools: Use exact parameter names from tool schema
+- For prompts: Use exact argument names from prompt schema (match case exactly - e.g., "shipmentId" not "shipment_id")
+If the tool/prompt requires an ID parameter (e.g., 'id', 'shipmentId'), extract the FULL '_id' value from the matching array item (the complete 24-character MongoDB ObjectId).
+DO NOT add fields like 'facilityName', 'name', etc. unless they are in the tool/prompt schema.
 DO NOT use placeholder or shortened ID values - always use the complete MongoDB ObjectId string.
+When extracting for prompts, map the _id field to the exact argument name required (e.g., if prompt needs "shipmentId", extract _id and set "shipmentId": "_id_value").
 
 Example: If get_facility(id: string) needs an ID, and you found:
   Item 1:
@@ -80,8 +89,9 @@ Example: If get_facility(id: string) needs an ID, and you found:
   ): Promise<CoordinationResult> {
     const { step, state, previousResults } = context
 
-    // Check tool schema to understand requirements
+    // Check tool or prompt schema to understand requirements
     const tool = findToolByName(state.mcpContext, step.action)
+    const mcpPrompt = state.mcpContext?.prompts?.find(p => p.name === step.action)
     const toolParams = tool ? getToolParameters(tool) : null
     const lookupFlow = detectLookupFlow(state.mcpContext, step.action)
 
@@ -99,13 +109,29 @@ Example: If get_facility(id: string) needs an ID, and you found:
           toolInfo += `\n- Suggested lookup tool: ${lookupFlow.lookupTool}`
         }
       }
+    } else if (mcpPrompt) {
+      const requiredArgs = mcpPrompt.arguments?.filter((a: any) => a.required).map((a: any) => a.name) || []
+      const optionalArgs = mcpPrompt.arguments?.filter((a: any) => !a.required).map((a: any) => a.name) || []
+      toolInfo = `\nPROMPT/WORKFLOW TEMPLATE INFORMATION:
+- Prompt: ${mcpPrompt.name}
+- Description: ${mcpPrompt.description || 'No description'}
+- Required arguments: ${requiredArgs.join(', ') || 'none'}
+- Optional arguments: ${optionalArgs.join(', ') || 'none'}
+- Note: This is a workflow template that may call multiple tools internally`
     } else {
-      toolInfo = `\n⚠️ Tool "${step.action}" not found in available MCP tools. Check available tools in system context.`
+      toolInfo = `\n⚠️ Action "${step.action}" not found in available MCP tools or prompts. Check available tools and prompts in system context.`
     }
+
+    // Extract user query context for better matching
+    const userQuery = state.requestContext.userQuery || ''
+    const userQueryContext = userQuery 
+      ? `\nUSER'S ORIGINAL QUERY: "${userQuery}"\nThis context helps identify which facility/item the user is looking for when matching names from arrays.`
+      : ''
 
     const prompt = `STEP COORDINATION ANALYSIS
 
 USER'S GOAL: ${state.plan.goal}
+${userQueryContext}
 
 CURRENT STEP:
 - Step ${step.order}: ${step.description}
@@ -180,10 +206,20 @@ ANALYSIS QUESTIONS:
        → DO NOT set extractedValues or parameters with null/empty values
        → DO NOT extract string "null" - this is wrong
    - If previous step returned an ARRAY with items, find the matching item by comparing:
+     * **CRITICAL NAME MATCHING**: Use the user's original query and step description to identify what to match
+     * Example: If user query mentions "Central Waste Processing Hub" and step description says "Get the facility ID for 'Central Waste Processing Hub'":
+       → Search array for item with name field containing "Central Waste Processing Hub" (case-insensitive, partial match OK)
+       → Try exact match first, then partial match (e.g., "Central Waste" matches "Central Waste Processing Hub")
+       → Remove common words like "the", "facility", "hub" for matching if needed
      * User query mentions "Hannover" → find item with name matching "Hannover" (case-insensitive, partial match OK)
      * User query mentions location → find item with location matching
      * User query mentions shortCode → find item with shortCode matching
-     * If multiple matches, use the first one
+     * **Fuzzy matching rules**:
+       - Case-insensitive: "Hannover" = "hannover" = "HANNOVER"
+       - Partial match: "Central Waste" matches "Central Waste Processing Hub"
+       - Word order doesn't matter: "Waste Processing Central" still matches "Central Waste Processing Hub"
+       - Ignore punctuation and extra spaces
+     * If multiple matches, use the first one that matches the user's intent
    - Once you find the matching item, extract the EXACT field needed:
      * If tool needs 'id' parameter → extract '_id' field from the matching array item
      * Use the FULL 24-character MongoDB ObjectId value, never use empty strings or placeholders
@@ -202,12 +238,21 @@ CRITICAL EXTRACTION RULES:
     → DO NOT set extractedValues or parameters
     → DO NOT extract "null" string - this is an error
 - If previous step returned an array WITH items and current step needs an ID:
-  1. Find the matching item in the array (by name, location, or other criteria from user query)
-  2. Extract the '_id' field from THAT item (marked with ⭐ in the results above)
-  3. The '_id' field is a MongoDB ObjectId: exactly 24 hexadecimal characters (0-9, a-f)
-  4. Use the EXACT '_id' value (all 24 characters) in the parameters - DO NOT shorten, modify, or use placeholder values
-  5. If you see '_id: "6905db9211cc522275d5f013"', use the ENTIRE string "6905db9211cc522275d5f013", not "123" or any part of it
-  6. If no matching item found (array has items but none match), set missingParams and recommendation: "ask-user"
+  1. **Find the matching item** in the array using these strategies (in order):
+     a. **Exact match**: Check if any item's name field exactly matches what the user is looking for (case-insensitive)
+     b. **Partial match**: Check if any item's name field contains the key words from user query/step description
+       - Example: User wants "Central Waste Processing Hub" → match item with name containing "Central Waste" or "Waste Processing Hub"
+     c. **Fuzzy match**: Try matching even if word order differs or extra words present
+     d. **Context-based match**: Use step description to understand what to match (e.g., "Get facility ID for 'Central Waste Processing Hub'")
+     e. **If array has only 1 item**: Use that item (user likely wants the only available option)
+  2. **Extract the '_id' field** from the MATCHED item (marked with ⭐ in the results above)
+     - The '_id' field is a MongoDB ObjectId: exactly 24 hexadecimal characters (0-9, a-f)
+     - Use the EXACT '_id' value (all 24 characters) in the parameters - DO NOT shorten, modify, or use placeholder values
+     - If you see '_id: "6905db9211cc522275d5f013"', use the ENTIRE string "6905db9211cc522275d5f013", not "123" or any part of it
+  3. **If no matching item found** (array has items but none match after trying all strategies):
+     - Set missingParams: [required parameter name]
+     - Set recommendation: "ask-user"
+     - Include in reasoning: "Could not find matching item in array. Available items: [list item names]"
 - Example: If list_facilities returned:
   Item 1:
     ⭐ _id: "6905db9211cc522275d5f013" (MongoDB ObjectId - use this for 'id' parameter)
@@ -403,15 +448,27 @@ Remember:
       }
     }
 
-    // Get tool schema to validate parameters
+    // Get tool or prompt schema to validate parameters
     const tool = findToolByName(state.mcpContext, step.action)
-    const toolParams = tool ? getToolParameters(tool) : null
+    const prompt = state.mcpContext?.prompts?.find(p => p.name === step.action)
     
-    // Create set of valid parameter names from tool schema
+    // Get parameters from either tool or prompt
+    const toolParams = tool ? getToolParameters(tool) : null
+    const promptParams = prompt ? {
+      required: prompt.arguments?.filter((a: any) => a.required).map((a: any) => a.name) || [],
+      optional: prompt.arguments?.filter((a: any) => !a.required).map((a: any) => a.name) || [],
+      all: prompt.arguments?.map((a: any) => ({ name: a.name, schema: {}, required: a.required })) || []
+    } : null
+    
+    // Use prompt params if tool params not available
+    const params = toolParams || promptParams
+    
+    // Create set of valid parameter names from tool or prompt schema
     const validParamNames = new Set<string>()
-    if (toolParams) {
-      toolParams.all.forEach(param => {
-        validParamNames.add(param.name)
+    if (params) {
+      params.all.forEach((param: any) => {
+        const paramName = typeof param === 'string' ? param : param.name
+        validParamNames.add(paramName)
       })
     }
 
@@ -469,13 +526,14 @@ Remember:
           continue
         }
         
-        // Only add parameters that exist in tool schema
-        if (toolParams && !validParamNames.has(key)) {
-          skipReason = 'parameter not in tool schema'
-          logger.warn(`[Coordinator] Skipping invalid parameter not in tool schema`, {
+        // Only add parameters that exist in tool/prompt schema
+        if (params && !validParamNames.has(key)) {
+          skipReason = 'parameter not in tool/prompt schema'
+          logger.warn(`[Coordinator] Skipping invalid parameter not in tool/prompt schema`, {
             stepId: step.id,
             parameter: key,
-            tool: step.action,
+            action: step.action,
+            isPrompt: !!prompt,
             validParams: Array.from(validParamNames),
           })
           extractionAttempts.push({ param: key, success: false, reason: skipReason })
@@ -564,9 +622,35 @@ Remember:
       // This helps when LLM doesn't extract IDs properly from array results
       const successfullyExtracted: string[] = []
       for (const paramName of remainingPlaceholders) {
+        logger.debug(`[Coordinator] Programmatic fallback check`, {
+          stepId: step.id,
+          remainingPlaceholders,
+          paramName: paramName,
+          previousResultsKeys: Object.keys(previousResults),
+          isPrompt: !!prompt,
+        })
+        
         if (paramName.toLowerCase().includes('id')) {
           // Try to find ID in previous results
+          // Check if placeholder references a specific step (e.g., EXTRACT_FROM_STEP_2, EXTRACT_FROM_STEP-2)
+          const placeholderValue = originalParameters[paramName]?.toString() || ''
+          const stepRefMatch = placeholderValue.match(/step[_-]?(\d+)/i)
+          const targetStepRef = stepRefMatch ? `step-${stepRefMatch[1]}` : null
+          
+          logger.debug(`[Coordinator] Programmatic ID extraction attempt`, {
+            stepId: step.id,
+            paramName,
+            placeholderValue,
+            targetStepRef,
+            availableSteps: Object.keys(previousResults),
+          })
+          
           for (const [stepId, result] of Object.entries(previousResults)) {
+            // If placeholder references specific step, only check that step
+            if (targetStepRef && stepId !== targetStepRef) {
+              continue
+            }
+            
             if (Array.isArray(result) && result.length > 0) {
               const firstItem = result[0]
               if (firstItem._id && typeof firstItem._id === 'string') {
@@ -587,6 +671,7 @@ Remember:
                   oldValue: oldValue,
                   newValue: firstItem._id,
                   sourceStep: stepId,
+                  wasTargeted: !!targetStepRef,
                 })
                 break
               }
@@ -601,12 +686,13 @@ Remember:
     // If coordinator provided updated parameters directly (validate against schema)
     if (coordinationResult.parameters) {
       for (const [key, value] of Object.entries(coordinationResult.parameters)) {
-        // Only add parameters that exist in tool schema
-        if (toolParams && !validParamNames.has(key)) {
-          logger.warn(`[Coordinator] Skipping invalid parameter not in tool schema`, {
+        // Only add parameters that exist in tool/prompt schema
+        if (params && !validParamNames.has(key)) {
+          logger.warn(`[Coordinator] Skipping invalid parameter not in tool/prompt schema`, {
             stepId: step.id,
             parameter: key,
-            tool: step.action,
+            action: step.action,
+            isPrompt: !!prompt,
             validParams: Array.from(validParamNames),
           })
           continue
@@ -622,6 +708,60 @@ Remember:
             newValue: value,
           })
         }
+      }
+    }
+
+    // MCP Validation: Validate coordinated parameters using MCP server
+    if (state.mcpContext && tool) {
+      try {
+        // Extract context for MCP validation
+        const execContext: Record<string, any> = {}
+        if (state.requestContext.userQuery) {
+          const shortCodeMatch = state.requestContext.userQuery.match(/\b([A-Z]{2,4})\b/g)
+          if (shortCodeMatch) {
+            execContext.shortCode = shortCodeMatch[0]
+            execContext.facilityCode = shortCodeMatch[0]
+          }
+        }
+        
+        // Extract from previous step results
+        for (const [stepId, result] of Object.entries(previousResults)) {
+          if (Array.isArray(result) && result.length > 0) {
+            const firstItem = result[0]
+            if (firstItem._id && !execContext.facilityId) {
+              execContext.facilityId = firstItem._id
+            }
+          } else if (result && typeof result === 'object' && result._id) {
+            if (!execContext.facilityId) {
+              execContext.facilityId = result._id
+            }
+          }
+        }
+
+        const validation = await validateToolParameters(
+          step.action,
+          parameters,
+          execContext
+        )
+
+        if (validation.missingParams.length > 0) {
+          logger.debug(`[Coordinator] MCP validation detected missing parameters`, {
+            stepId: step.id,
+            missingParams: validation.missingParams,
+            categorization: validation.categorization,
+          })
+          
+          // Note: We don't resolve parameters here - that's done in step-executor
+          // But we can log the categorization for debugging
+        } else if (validation.validation.isValid) {
+          logger.debug(`[Coordinator] MCP validation passed`, {
+            stepId: step.id,
+            providedParams: validation.providedParams,
+          })
+        }
+      } catch (error: any) {
+        // Don't fail coordination if validation fails - step-executor will handle it
+        logger.debug(`[Coordinator] MCP validation failed (non-critical):`, error.message)
       }
     }
 

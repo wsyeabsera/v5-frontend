@@ -1,0 +1,12 @@
+{
+  "success": true,
+  "message": "Demo reset complete",
+  "stats": {
+    "requestsCreated": 42,
+    "requestsFailed": 0,
+    "totalQueries": 42,
+    "toolCoverageRequests": 29,
+    "promptRequests": 13,
+    "mcpPromptsFetched": 13
+  }
+}

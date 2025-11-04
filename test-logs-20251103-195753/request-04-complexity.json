@@ -1,0 +1,33 @@
+{
+  "requestId": "5cc8dac1-4851-4e5d-8c6f-6dceeff3e226",
+  "agentName": "complexity-detector",
+  "timestamp": "2025-11-03T19:01:21.580Z",
+  "requestContext": {
+    "requestId": "5cc8dac1-4851-4e5d-8c6f-6dceeff3e226",
+    "createdAt": "2025-11-03T19:01:20.918Z",
+    "agentChain": [
+      "complexity-detector"
+    ],
+    "status": "completed",
+    "userQuery": "Get details for facility HAN"
+  },
+  "complexity": {
+    "score": 0.0384,
+    "reasoningPasses": 1,
+    "factors": {
+      "queryLength": 0.056,
+      "hasMultipleQuestions": false,
+      "requiresMultiStep": false,
+      "involvesAnalysis": false,
+      "needsDataAggregation": false,
+      "domainComplexity": 0.2
+    }
+  },
+  "userQuery": "Get details for facility HAN",
+  "detectedKeywords": [
+    "facility"
+  ],
+  "detectionMethod": "keyword",
+  "llmUsed": false,
+  "llmConfidence": 0.7
+}

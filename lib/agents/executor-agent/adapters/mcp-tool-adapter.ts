@@ -93,3 +93,41 @@ export async function callMCPTool(name: string, args: any): Promise<any> {
   }
 }
 
+/**
+ * Validate tool parameters using MCP server's tools/validate endpoint
+ * 
+ * @param toolName - Name of the tool to validate
+ * @param arguments - Current arguments/parameters to validate
+ * @param context - Optional context (e.g., facilityCode, shortCode) for better categorization
+ * @returns Validation result with categorization (resolvable, mustAskUser, canInfer)
+ */
+export async function validateToolParameters(
+  toolName: string,
+  args: Record<string, any>,
+  context?: Record<string, any>
+): Promise<{
+  toolName: string
+  requiredParams: string[]
+  providedParams: string[]
+  missingParams: string[]
+  categorization: {
+    resolvable: string[]
+    mustAskUser: string[]
+    canInfer: string[]
+  }
+  validation: {
+    isValid: boolean
+    invalidParams: string[]
+  }
+  confidence: number
+}> {
+  const result = await serverMCPRequest('tools/validate', {
+    name: toolName,
+    arguments: args,
+    context: context || {},
+  })
+  
+  // Return the validation result directly
+  return result
+}
+

@@ -1,0 +1,336 @@
+{
+  "requestId": "5d34302f-d8c7-4191-8b37-42ee316baac6",
+  "agentName": "executor-agent",
+  "timestamp": "2025-11-03T19:00:46.246Z",
+  "requestContext": {
+    "requestId": "5d34302f-d8c7-4191-8b37-42ee316baac6",
+    "createdAt": "2025-11-03T19:00:18.132Z",
+    "agentChain": [
+      "complexity-detector",
+      "thought-agent",
+      "planner-agent",
+      "critic-agent"
+    ],
+    "status": "completed",
+    "userQuery": "List all contracts"
+  },
+  "executionResult": {
+    "planId": "plan-1762196435114",
+    "overallSuccess": true,
+    "steps": [
+      {
+        "stepId": "step-1",
+        "stepOrder": 1,
+        "success": true,
+        "result": [
+          {
+            "_id": "6905db9211cc522275d5f016",
+            "producerName": "ABC Waste Corp",
+            "debitorName": "City Services Ltd",
+            "wasteCode": "WC-2025-001",
+            "createdAt": "2025-11-01T10:06:10.368Z",
+            "updatedAt": "2025-11-01T10:06:10.368Z",
+            "__v": 0
+          },
+          {
+            "_id": "690605e5279af4bcf42f9eaf",
+            "producerName": "Green Industries Inc",
+            "debitorName": "EcoWaste Solutions Premium",
+            "wasteCode": "19-12-10",
+            "createdAt": "2025-11-01T13:06:45.011Z",
+            "updatedAt": "2025-11-01T13:06:56.335Z",
+            "__v": 0
+          },
+          {
+            "_id": "690605e5279af4bcf42f9eb1",
+            "producerName": "TechManufacturing Corp",
+            "debitorName": "Industrial Waste Services",
+            "wasteCode": "20-01-36",
+            "createdAt": "2025-11-01T13:06:45.827Z",
+            "updatedAt": "2025-11-01T13:06:45.827Z",
+            "__v": 0
+          },
+          {
+            "_id": "6908eae3894ded4128bcbd0f",
+            "producerName": "Green Industries Inc",
+            "debitorName": "Test Facility Alpha",
+            "wasteCode": "WC-2025-001",
+            "createdAt": "2025-11-03T17:48:19.115Z",
+            "updatedAt": "2025-11-03T17:48:19.115Z",
+            "__v": 0
+          },
+          {
+            "_id": "6908eae3894ded4128bcbd11",
+            "producerName": "Eco Waste Solutions",
+            "debitorName": "Central Waste Processing Hub",
+            "wasteCode": "WC-2025-002",
+            "createdAt": "2025-11-03T17:48:19.878Z",
+            "updatedAt": "2025-11-03T17:48:19.878Z",
+            "__v": 0
+          },
+          {
+            "_id": "6908eae4894ded4128bcbd13",
+            "producerName": "Green Industries Inc",
+            "debitorName": "Test Facility Beta",
+            "wasteCode": "WC-2025-003",
+            "createdAt": "2025-11-03T17:48:20.574Z",
+            "updatedAt": "2025-11-03T17:48:20.574Z",
+            "__v": 0
+          },
+          {
+            "_id": "6908ec1dd3b491b0806cbbc6",
+            "producerName": "Advanced Manufacturing Corp",
+            "debitorName": "Pacific Rim Waste Management",
+            "wasteCode": "WC-MFG-2025-001",
+            "createdAt": "2025-11-03T17:53:33.771Z",
+            "updatedAt": "2025-11-03T17:53:33.771Z",
+            "__v": 0
+          },
+          {
+            "_id": "6908ec1ed3b491b0806cbbc8",
+            "producerName": "BioChemical Industries",
+            "debitorName": "Atlantic Recycling Center",
+            "wasteCode": "WC-BIO-2025-002",
+            "createdAt": "2025-11-03T17:53:34.511Z",
+            "updatedAt": "2025-11-03T17:53:34.511Z",
+            "__v": 0
+          },
+          {
+            "_id": "6908ec1fd3b491b0806cbbca",
+            "producerName": "Petroleum Refining LLC",
+            "debitorName": "Gulf Coast Processing Facility",
+            "wasteCode": "WC-PET-2025-003",
+            "createdAt": "2025-11-03T17:53:35.203Z",
+            "updatedAt": "2025-11-03T17:53:35.203Z",
+            "__v": 0
+          },
+          {
+            "_id": "6908ec20d3b491b0806cbbcc",
+            "producerName": "Tech Electronics Group",
+            "debitorName": "Mountain View Waste Solutions",
+            "wasteCode": "WC-TEC-2025-004",
+            "createdAt": "2025-11-03T17:53:36.001Z",
+            "updatedAt": "2025-11-03T17:53:36.001Z",
+            "__v": 0
+          },
+          {
+            "_id": "6908ec20d3b491b0806cbbce",
+            "producerName": "Solar Panel Manufacturing",
+            "debitorName": "Desert Valley Disposal",
+            "wasteCode": "WC-SOL-2025-005",
+            "createdAt": "2025-11-03T17:53:36.599Z",
+            "updatedAt": "2025-11-03T17:53:36.599Z",
+            "__v": 0
+          },
+          {
+            "_id": "6908ec21d3b491b0806cbbd0",
+            "producerName": "Automotive Parts Co",
+            "debitorName": "Great Lakes Industrial Waste",
+            "wasteCode": "WC-AUT-2025-006",
+            "createdAt": "2025-11-03T17:53:37.125Z",
+            "updatedAt": "2025-11-03T17:53:37.125Z",
+            "__v": 0
+          },
+          {
+            "_id": "6908ec21d3b491b0806cbbd2",
+            "producerName": "Organic Food Processing Inc",
+            "debitorName": "Pacific Northwest EcoCenter",
+            "wasteCode": "WC-ORG-2025-007",
+            "createdAt": "2025-11-03T17:53:37.797Z",
+            "updatedAt": "2025-11-03T17:53:37.797Z",
+            "__v": 0
+          },
+          {
+            "_id": "6908ec22d3b491b0806cbbd4",
+            "producerName": "Textile Manufacturing Ltd",
+            "debitorName": "Southeast Recycling Hub",
+            "wasteCode": "WC-TEX-2025-008",
+            "createdAt": "2025-11-03T17:53:38.430Z",
+            "updatedAt": "2025-11-03T17:53:38.430Z",
+            "__v": 0
+          },
+          {
+            "_id": "6908ec23d3b491b0806cbbd6",
+            "producerName": "Agricultural Waste Solutions",
+            "debitorName": "Midwest Processing Plant",
+            "wasteCode": "WC-AGR-2025-009",
+            "createdAt": "2025-11-03T17:53:39.018Z",
+            "updatedAt": "2025-11-03T17:53:39.018Z",
+            "__v": 0
+          },
+          {
+            "_id": "6908ec23d3b491b0806cbbd8",
+            "producerName": "Pharmaceutical Research Labs",
+            "debitorName": "Northeast Waste Management",
+            "wasteCode": "WC-PHA-2025-010",
+            "createdAt": "2025-11-03T17:53:39.636Z",
+            "updatedAt": "2025-11-03T17:53:39.636Z",
+            "__v": 0
+          }
+        ],
+        "duration": 1851,
+        "retries": 0,
+        "timestamp": "2025-11-03T19:00:44.239Z",
+        "toolCalled": "list_contracts",
+        "parametersUsed": {}
+      }
+    ],
+    "partialResults": {
+      "step-1": [
+        {
+          "_id": "6905db9211cc522275d5f016",
+          "producerName": "ABC Waste Corp",
+          "debitorName": "City Services Ltd",
+          "wasteCode": "WC-2025-001",
+          "createdAt": "2025-11-01T10:06:10.368Z",
+          "updatedAt": "2025-11-01T10:06:10.368Z",
+          "__v": 0
+        },
+        {
+          "_id": "690605e5279af4bcf42f9eaf",
+          "producerName": "Green Industries Inc",
+          "debitorName": "EcoWaste Solutions Premium",
+          "wasteCode": "19-12-10",
+          "createdAt": "2025-11-01T13:06:45.011Z",
+          "updatedAt": "2025-11-01T13:06:56.335Z",
+          "__v": 0
+        },
+        {
+          "_id": "690605e5279af4bcf42f9eb1",
+          "producerName": "TechManufacturing Corp",
+          "debitorName": "Industrial Waste Services",
+          "wasteCode": "20-01-36",
+          "createdAt": "2025-11-01T13:06:45.827Z",
+          "updatedAt": "2025-11-01T13:06:45.827Z",
+          "__v": 0
+        },
+        {
+          "_id": "6908eae3894ded4128bcbd0f",
+          "producerName": "Green Industries Inc",
+          "debitorName": "Test Facility Alpha",
+          "wasteCode": "WC-2025-001",
+          "createdAt": "2025-11-03T17:48:19.115Z",
+          "updatedAt": "2025-11-03T17:48:19.115Z",
+          "__v": 0
+        },
+        {
+          "_id": "6908eae3894ded4128bcbd11",
+          "producerName": "Eco Waste Solutions",
+          "debitorName": "Central Waste Processing Hub",
+          "wasteCode": "WC-2025-002",
+          "createdAt": "2025-11-03T17:48:19.878Z",
+          "updatedAt": "2025-11-03T17:48:19.878Z",
+          "__v": 0
+        },
+        {
+          "_id": "6908eae4894ded4128bcbd13",
+          "producerName": "Green Industries Inc",
+          "debitorName": "Test Facility Beta",
+          "wasteCode": "WC-2025-003",
+          "createdAt": "2025-11-03T17:48:20.574Z",
+          "updatedAt": "2025-11-03T17:48:20.574Z",
+          "__v": 0
+        },
+        {
+          "_id": "6908ec1dd3b491b0806cbbc6",
+          "producerName": "Advanced Manufacturing Corp",
+          "debitorName": "Pacific Rim Waste Management",
+          "wasteCode": "WC-MFG-2025-001",
+          "createdAt": "2025-11-03T17:53:33.771Z",
+          "updatedAt": "2025-11-03T17:53:33.771Z",
+          "__v": 0
+        },
+        {
+          "_id": "6908ec1ed3b491b0806cbbc8",
+          "producerName": "BioChemical Industries",
+          "debitorName": "Atlantic Recycling Center",
+          "wasteCode": "WC-BIO-2025-002",
+          "createdAt": "2025-11-03T17:53:34.511Z",
+          "updatedAt": "2025-11-03T17:53:34.511Z",
+          "__v": 0
+        },
+        {
+          "_id": "6908ec1fd3b491b0806cbbca",
+          "producerName": "Petroleum Refining LLC",
+          "debitorName": "Gulf Coast Processing Facility",
+          "wasteCode": "WC-PET-2025-003",
+          "createdAt": "2025-11-03T17:53:35.203Z",
+          "updatedAt": "2025-11-03T17:53:35.203Z",
+          "__v": 0
+        },
+        {
+          "_id": "6908ec20d3b491b0806cbbcc",
+          "producerName": "Tech Electronics Group",
+          "debitorName": "Mountain View Waste Solutions",
+          "wasteCode": "WC-TEC-2025-004",
+          "createdAt": "2025-11-03T17:53:36.001Z",
+          "updatedAt": "2025-11-03T17:53:36.001Z",
+          "__v": 0
+        },
+        {
+          "_id": "6908ec20d3b491b0806cbbce",
+          "producerName": "Solar Panel Manufacturing",
+          "debitorName": "Desert Valley Disposal",
+          "wasteCode": "WC-SOL-2025-005",
+          "createdAt": "2025-11-03T17:53:36.599Z",
+          "updatedAt": "2025-11-03T17:53:36.599Z",
+          "__v": 0
+        },
+        {
+          "_id": "6908ec21d3b491b0806cbbd0",
+          "producerName": "Automotive Parts Co",
+          "debitorName": "Great Lakes Industrial Waste",
+          "wasteCode": "WC-AUT-2025-006",
+          "createdAt": "2025-11-03T17:53:37.125Z",
+          "updatedAt": "2025-11-03T17:53:37.125Z",
+          "__v": 0
+        },
+        {
+          "_id": "6908ec21d3b491b0806cbbd2",
+          "producerName": "Organic Food Processing Inc",
+          "debitorName": "Pacific Northwest EcoCenter",
+          "wasteCode": "WC-ORG-2025-007",
+          "createdAt": "2025-11-03T17:53:37.797Z",
+          "updatedAt": "2025-11-03T17:53:37.797Z",
+          "__v": 0
+        },
+        {
+          "_id": "6908ec22d3b491b0806cbbd4",
+          "producerName": "Textile Manufacturing Ltd",
+          "debitorName": "Southeast Recycling Hub",
+          "wasteCode": "WC-TEX-2025-008",
+          "createdAt": "2025-11-03T17:53:38.430Z",
+          "updatedAt": "2025-11-03T17:53:38.430Z",
+          "__v": 0
+        },
+        {
+          "_id": "6908ec23d3b491b0806cbbd6",
+          "producerName": "Agricultural Waste Solutions",
+          "debitorName": "Midwest Processing Plant",
+          "wasteCode": "WC-AGR-2025-009",
+          "createdAt": "2025-11-03T17:53:39.018Z",
+          "updatedAt": "2025-11-03T17:53:39.018Z",
+          "__v": 0
+        },
+        {
+          "_id": "6908ec23d3b491b0806cbbd8",
+          "producerName": "Pharmaceutical Research Labs",
+          "debitorName": "Northeast Waste Management",
+          "wasteCode": "WC-PHA-2025-010",
+          "createdAt": "2025-11-03T17:53:39.636Z",
+          "updatedAt": "2025-11-03T17:53:39.636Z",
+          "__v": 0
+        }
+      ]
+    },
+    "errors": [],
+    "totalDuration": 3858,
+    "questionsAsked": [],
+    "adaptations": []
+  },
+  "planId": "plan-1762196435114",
+  "requiresUserFeedback": false,
+  "critiqueAvailable": true,
+  "critiqueRecommendation": "approve",
+  "executionVersion": 1
+}

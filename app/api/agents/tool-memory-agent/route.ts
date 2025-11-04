@@ -138,3 +138,61 @@ export async function GET(req: NextRequest) {
   }
 }
 
+/**
+ * PUT endpoint - updates agent config
+ */
+export async function PUT(req: NextRequest) {
+  try {
+    const body = await req.json()
+    const config: AgentConfig = body
+
+    // Ensure agentId is tool-memory-agent
+    config.agentId = 'tool-memory-agent'
+
+    const storage = getAgentConfigStorage()
+    const success = await storage.saveAgentConfig(config)
+
+    if (!success) {
+      return NextResponse.json(
+        { error: 'Failed to update agent config' },
+        { status: 500 }
+      )
+    }
+
+    // Return the updated config
+    const updatedConfig = await storage.getAgentConfig('tool-memory-agent')
+    return NextResponse.json({ config: updatedConfig }, { status: 200 })
+  } catch (error: any) {
+    logger.error(`[Tool Memory Agent API] PUT error:`, error.message, error)
+    return NextResponse.json(
+      { error: error.message || 'Failed to update agent config' },
+      { status: 500 }
+    )
+  }
+}
+
+/**
+ * DELETE endpoint - deletes agent config
+ */
+export async function DELETE() {
+  try {
+    const storage = getAgentConfigStorage()
+    const success = await storage.deleteAgentConfig('tool-memory-agent')
+
+    if (!success) {
+      return NextResponse.json(
+        { error: 'Failed to delete agent config' },
+        { status: 500 }
+      )
+    }
+
+    return NextResponse.json({ success: true }, { status: 200 })
+  } catch (error: any) {
+    logger.error(`[Tool Memory Agent API] DELETE error:`, error.message, error)
+    return NextResponse.json(
+      { error: error.message || 'Failed to delete agent config' },
+      { status: 500 }
+    )
+  }
+}
+

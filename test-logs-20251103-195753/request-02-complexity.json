@@ -1,0 +1,35 @@
+{
+  "requestId": "5d34302f-d8c7-4191-8b37-42ee316baac6",
+  "agentName": "complexity-detector",
+  "timestamp": "2025-11-03T19:00:19.213Z",
+  "requestContext": {
+    "requestId": "5d34302f-d8c7-4191-8b37-42ee316baac6",
+    "createdAt": "2025-11-03T19:00:18.132Z",
+    "agentChain": [
+      "complexity-detector"
+    ],
+    "status": "completed",
+    "userQuery": "List all contracts"
+  },
+  "complexity": {
+    "score": 0.21539999999999998,
+    "reasoningPasses": 1,
+    "factors": {
+      "queryLength": 0.036,
+      "hasMultipleQuestions": false,
+      "requiresMultiStep": false,
+      "involvesAnalysis": false,
+      "needsDataAggregation": true,
+      "domainComplexity": 0.4
+    }
+  },
+  "userQuery": "List all contracts",
+  "detectedKeywords": [
+    "all",
+    "contract",
+    "contracts"
+  ],
+  "detectionMethod": "keyword",
+  "llmUsed": false,
+  "llmConfidence": 0.7
+}

@@ -7,13 +7,14 @@ import { RequestFilters, RequestFiltersState } from '@/components/requests/Reque
 import { RequestDetailModal } from '@/components/requests/RequestDetailModal'
 import { CreateRequestDialog } from '@/components/requests/CreateRequestDialog'
 import { Button } from '@/components/ui/button'
-import { getAllRequests, deleteRequest, deleteAllRequests } from '@/lib/api/requests-api'
-import { Plus, RefreshCw, X, Trash2 } from 'lucide-react'
+import { getAllRequests, deleteRequest, deleteAllRequests, resetDemoData } from '@/lib/api/requests-api'
+import { Plus, RefreshCw, X, Trash2, RotateCcw } from 'lucide-react'
 import { DeleteAllDialog } from '@/components/ui/delete-all-dialog'
 
 export default function RequestsPage() {
   const [requests, setRequests] = useState<RequestContext[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [isResetting, setIsResetting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [selectedRequest, setSelectedRequest] = useState<RequestContext | null>(null)
   const [isDetailOpen, setIsDetailOpen] = useState(false)
@@ -48,9 +49,13 @@ export default function RequestsPage() {
   // Get unique agent names from all requests
   const availableAgents = useMemo(() => {
     const agentsSet = new Set<string>()
-    requests.forEach((req) => {
-      req.agentChain.forEach((agent) => agentsSet.add(agent))
-    })
+    if (requests && requests.length > 0) {
+      requests.forEach((req) => {
+        if (req.agentChain) {
+          req.agentChain.forEach((agent) => agentsSet.add(agent))
+        }
+      })
+    }
     return Array.from(agentsSet).sort()
   }, [requests])
 
@@ -116,6 +121,26 @@ export default function RequestsPage() {
     }
   }
 
+  const handleReset = async () => {
+    setIsResetting(true)
+    setError(null)
+    try {
+      const result = await resetDemoData()
+      // Show success message with stats
+      const message = result.stats
+        ? `Demo reset complete: ${result.stats.requestsCreated} request${result.stats.requestsCreated !== 1 ? 's' : ''} created`
+        : result.message || 'Demo reset complete'
+      alert(message)
+      // Refresh the requests list after reset
+      await loadRequests()
+    } catch (error: any) {
+      console.error('Failed to reset demo data:', error)
+      setError(error?.message || 'Failed to reset demo data')
+    } finally {
+      setIsResetting(false)
+    }
+  }
+
   return (
     <div className="min-h-screen p-6">
       <div className="max-w-7xl mx-auto space-y-6">
@@ -139,6 +164,18 @@ export default function RequestsPage() {
                 className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`}
               />
               Refresh
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleReset}
+              disabled={isLoading || isResetting}
+              className="gap-2"
+            >
+              <RotateCcw
+                className={`w-4 h-4 ${isResetting ? 'animate-spin' : ''}`}
+              />
+              Reset
             </Button>
             {requests.length > 0 && (
               <Button

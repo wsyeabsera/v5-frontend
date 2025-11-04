@@ -13,11 +13,13 @@
  */
 
 import { BaseAgent } from './base-agent'
-import { Thought, Plan, PlanStep, PlannerAgentOutput, RequestContext, MCPContext, PlanExample } from '@/types'
+import { Thought, Plan, PlanStep, PlannerAgentOutput, RequestContext, MCPContext, PlanExample, ToolMemoryOutput, ComplexityScore, ThoughtAgentOutput } from '@/types'
 import { logger } from '@/utils/logger'
-import { listMCPPrompts, listMCPTools } from '@/lib/mcp-prompts'
+import { listMCPPrompts, listMCPTools, getMCPPrompt } from '@/lib/mcp-prompts'
 import { querySimilarPlanExamples, incrementPlanExampleUsage } from '@/lib/pinecone/planner-examples'
 import { generateEmbedding } from '@/lib/ollama/embeddings'
+import { ToolMemoryAgent } from './tool-memory-agent'
+import { contextCompressor, CompressionConfig } from '@/lib/utils/context-compressor'
 
 /**
  * Planner Agent Class
@@ -101,23 +103,50 @@ CRITICAL FORMAT REQUIREMENTS:
      * CORRECT: {"facilityId": "EXTRACT_FROM_STEP_1"} (if step 1 can provide it)
      * CORRECT: {"material": "Plastic"} (if user query mentions "plastic")
 
-TOOL USAGE CONSTRAINT - CRITICAL:
-- ONLY use tools that appear in the "Available MCP Tools" section below
-- DO NOT invent tool names or use patterns like "multi_tool_use.*" or "functions.*"
-- DO NOT use abstract tool names like "analyze", "calculate", "count" - these don't exist
-- DO NOT create compound tools like "multi_tool_use.parallel" or "functions.analyze_contract_producers"
-- Valid tool examples: "list_facilities", "get_facility", "list_shipments", "generate_intelligent_facility_report"
-- Invalid tool examples: "multi_tool_use.parallel", "functions.analyze_contract_producers", "analyze_shipments"
-- If you need to analyze data, use the actual analysis tools from the list:
-  * "generate_intelligent_facility_report" for facility analysis
-  * "analyze_shipment_risk" for shipment analysis
-  * "suggest_inspection_questions" for inspection questions
-- If a required operation doesn't have a direct tool, structure the plan to:
-  1. Use existing tools in sequence (e.g., list_tools → process results manually)
-  2. Use available analysis tools if they match the need
-  3. Simplify the plan to use only available tools
+8. CRITICAL - Response Fields vs Filter Parameters:
+   - **Response fields** (like explosive_level, hcl_level, so2_level) are data that comes BACK from the tool, NOT filter parameters you send TO the tool
+   - **DO NOT use response fields as filter parameters** - they will cause validation errors
+   - **For list_contaminants**: Valid filter parameters are ONLY: facilityId, shipment_id, material
+   - **If user wants "high risk contaminants"**: Use list_contaminants with valid filters (facilityId, shipment_id, material), then filter results in the description
+   - Examples:
+     * ❌ WRONG: {"explosive_level": "high", "hcl_level": "high"} → These are NOT valid parameters
+     * ✅ CORRECT: {"facilityId": "EXTRACT_FROM_STEP_1"} → Use valid filter parameters
+     * ✅ CORRECT: {"material": "Plastic"} → Use valid filter parameters
+     * ✅ CORRECT: {} → No filters, get all contaminants, then describe filtering for high-risk in the step description
 
-Before finalizing your plan, verify EVERY tool name in your steps exists in the "Available MCP Tools" list below.
+TOOL USAGE CONSTRAINT - CRITICAL - READ THIS MULTIPLE TIMES:
+🚨 **NEVER INVENT TOOL NAMES** 🚨
+- ONLY use tools that appear EXACTLY as shown in the "Available MCP Tools" section below
+- DO NOT create new tool names, even if they seem logical (e.g., "find-high-risk-contaminants-and-facilities" does NOT exist)
+- DO NOT use patterns like "multi_tool_use.*" or "functions.*" - these are NOT valid tools
+- DO NOT use abstract tool names like "analyze", "calculate", "count", "find" - these don't exist
+- DO NOT create compound/hyphenated tool names like "find-high-risk-contaminants" or "analyze-facility-compliance"
+- DO NOT use workflow template names as tool names - workflow templates are prompts, not tools
+
+✅ Valid tool examples (copy EXACTLY from the list below):
+  - "list_facilities", "get_facility", "list_shipments", "list_contaminants"
+  - "generate_intelligent_facility_report", "analyze_shipment_risk", "suggest_inspection_questions"
+  - "create_contaminant", "get_contaminant", "update_contaminant"
+
+❌ Invalid tool examples (DO NOT USE THESE):
+  - "find-high-risk-contaminants-and-facilities" (doesn't exist - use list_contaminants + filter)
+  - "analyze-facility-compliance" (doesn't exist - use generate_intelligent_facility_report)
+  - "multi_tool_use.parallel" (doesn't exist)
+  - "functions.analyze_contract_producers" (doesn't exist)
+
+**If you need to perform an operation:**
+1. Check if an exact tool exists in the "Available MCP Tools" list below
+2. If no exact tool exists, break it down into steps using existing tools:
+   - Example: "find high risk contaminants" → use "list_contaminants" then filter results
+   - Example: "analyze facility" → use "generate_intelligent_facility_report"
+3. NEVER invent a tool name - if a tool doesn't exist in the list, use multiple existing tools in sequence
+
+**MANDATORY VERIFICATION STEP:**
+Before finalizing your plan, check EVERY tool name in your steps:
+1. Open the "Available MCP Tools" section below
+2. Search for each tool name you used
+3. If you cannot find it EXACTLY as written, REPLACE it with an existing tool
+4. If you're unsure, use a simpler tool like "list_contaminants" or "list_facilities" and filter results in subsequent steps
 
 You MUST respond with ONLY a valid JSON object in this exact format:
 
@@ -254,36 +283,127 @@ Remember: You are outputting JSON only, no text before or after the JSON object.
   }
 
   /**
+   * Fetch tool recommendations from Tool Memory Agent
+   * 
+   * @param userQuery - Original user query
+   * @param requestContext - Request context
+   * @param complexityScore - Optional complexity score
+   * @returns Tool recommendations or null if unavailable
+   */
+  private async fetchToolRecommendations(
+    userQuery: string,
+    requestContext: RequestContext,
+    complexityScore?: ComplexityScore
+  ): Promise<ToolMemoryOutput | null> {
+    try {
+      const toolMemoryAgent = new ToolMemoryAgent()
+      
+      // Try to initialize (may fail if not configured)
+      try {
+        await toolMemoryAgent.initialize()
+      } catch (error: any) {
+        logger.debug(`[PlannerAgent] Tool Memory Agent not available:`, error.message)
+        return null
+      }
+
+      const mcpContext = await this.fetchMCPContext()
+      const recommendations = await toolMemoryAgent.recommendTools(
+        userQuery,
+        requestContext,
+        complexityScore,
+        mcpContext
+      )
+
+      logger.debug(`[PlannerAgent] Fetched tool recommendations`, {
+        toolsRecommended: recommendations.recommendedTools.length,
+      })
+
+      return recommendations
+    } catch (error: any) {
+      logger.warn(`[PlannerAgent] Failed to fetch tool recommendations:`, error.message)
+      return null
+    }
+  }
+
+  /**
    * Build enhanced system prompt with context
    * 
    * Dynamically constructs system prompt with MCP context and similar examples.
+   * Optionally compresses context to reduce token usage.
    * 
    * @param mcpContext - MCP tools/resources/prompts
    * @param similarExamples - Similar plan examples from Pinecone
+   * @param toolRecommendations - Optional tool recommendations from Tool Memory Agent
+   * @param compressionConfig - Optional compression configuration
    * @returns Enhanced system prompt
    */
   private buildEnhancedSystemPrompt(
     mcpContext: MCPContext,
-    similarExamples: Array<{ example: PlanExample; similarity: number }> = []
+    similarExamples: Array<{ example: PlanExample; similarity: number }> = [],
+    toolRecommendations?: ToolMemoryOutput,
+    compressionConfig?: CompressionConfig,
+    expandedPromptSteps: PlanStep[] = []
   ): string {
     let prompt = this.baseSystemPrompt + '\n\n'
 
+    // Apply compression to context if needed
+    const shouldCompress = compressionConfig !== undefined
+    let finalMCPContext = mcpContext
+    let finalExamples = similarExamples
+    let finalToolRecommendations = toolRecommendations
+
+    if (shouldCompress && compressionConfig) {
+      // Compress MCP context
+      const { context: compressedContext, actions: contextActions } = contextCompressor.compressMCPContext(
+        mcpContext,
+        compressionConfig
+      )
+      finalMCPContext = compressedContext
+      if (contextActions.length > 0) {
+        logger.debug(`[PlannerAgent] Compressed MCP context`, { actions: contextActions })
+      }
+
+      // Compress similar examples
+      const { examples: compressedExamples, actions: exampleActions } = contextCompressor.compressSimilarExamples(
+        similarExamples,
+        compressionConfig
+      )
+      finalExamples = compressedExamples
+      if (exampleActions.length > 0) {
+        logger.debug(`[PlannerAgent] Compressed similar examples`, { actions: exampleActions })
+      }
+
+      // Compress tool recommendations
+      const { recommendations: compressedRecs, actions: recActions } = contextCompressor.compressToolRecommendations(
+        toolRecommendations,
+        compressionConfig
+      )
+      finalToolRecommendations = compressedRecs
+      if (recActions.length > 0) {
+        logger.debug(`[PlannerAgent] Compressed tool recommendations`, { actions: recActions })
+      }
+    }
+
     // Add MCP tools context (critical for planning)
-    if (mcpContext.tools.length > 0) {
-      const categorized = this.categorizeTools(mcpContext.tools)
+    if (finalMCPContext.tools.length > 0) {
+      const categorized = this.categorizeTools(finalMCPContext.tools)
       
       prompt += '## Available MCP Tools\n\n'
-      prompt += '🚨 CRITICAL - READ THIS CAREFULLY:\n'
+      prompt += '🚨🚨🚨 CRITICAL - READ THIS MULTIPLE TIMES 🚨🚨🚨\n'
+      prompt += 'THIS IS THE COMPLETE LIST OF VALID TOOLS - USE ONLY THESE:\n'
       prompt += '1. ONLY use tool names that appear EXACTLY as shown in this list below\n'
-      prompt += '2. DO NOT use tool names starting with "multi_tool_use", "functions", or any pattern\n'
-      prompt += '3. DO NOT invent new tool names - if a tool is not listed here, it does NOT exist\n'
-      prompt += '4. DO NOT create compound tools or abstract names like "analyze", "calculate", "count"\n'
-      prompt += '5. DO NOT use "review-shipment-inspection" in the action field - that is a PROMPT, not a tool\n'
-      prompt += '6. Valid tools have names like: "list_facilities", "get_facility", "list_shipments", "generate_intelligent_facility_report"\n'
-      prompt += '7. Invalid tools (DO NOT USE): "multi_tool_use.*", "functions.*", "analyze_*", "review-*"\n'
-      prompt += '8. Use EXACT tool names and parameter names as shown below\n'
+      prompt += '2. DO NOT invent, create, or guess tool names - if a tool is not listed here, it DOES NOT EXIST\n'
+      prompt += '3. DO NOT use tool names starting with "multi_tool_use", "functions", or any pattern\n'
+      prompt += '4. DO NOT create compound/hyphenated tool names like "find-high-risk-contaminants" or "analyze-facility-compliance"\n'
+      prompt += '5. DO NOT use abstract tool names like "analyze", "calculate", "count", "find" - these don\'t exist\n'
+      prompt += '6. DO NOT use workflow template/prompt names as tools - prompts are not tools\n'
+      prompt += '7. Valid tool format: lowercase with underscores (e.g., "list_facilities", "get_facility")\n'
+      prompt += '8. Invalid tool examples (DO NOT USE): "find-high-risk-contaminants", "analyze-facility", "multi_tool_use.*"\n'
       prompt += '9. If you need functionality not covered by a single tool, create a multi-step plan using EXISTING tools ONLY\n'
-      prompt += '\n⚠️ VALIDATION: Before responding, verify EVERY tool name in your plan exists in the list below.\n\n'
+      prompt += '\n⚠️ MANDATORY VERIFICATION: Before finalizing your plan:\n'
+      prompt += '   - Check each tool name in your steps against this list\n'
+      prompt += '   - If you cannot find it EXACTLY as written, replace it with an existing tool\n'
+      prompt += '   - If unsure, use "list_contaminants" or "list_facilities" and filter results in subsequent steps\n\n'
       
       for (const [category, tools] of Object.entries(categorized)) {
         if (tools.length > 0) {
@@ -383,23 +503,84 @@ Remember: You are outputting JSON only, no text before or after the JSON object.
     }
 
     // Add MCP prompts context
-    if (mcpContext.prompts.length > 0) {
+    if (finalMCPContext.prompts.length > 0) {
       prompt += '## Available Workflow Templates\n\n'
       prompt += 'These are pre-built analysis workflows you can leverage:\n\n'
       
-      for (const mcpPrompt of mcpContext.prompts) {
+      for (const mcpPrompt of finalMCPContext.prompts) {
         prompt += `- **${mcpPrompt.name}**: ${mcpPrompt.description}\n`
       }
 
       prompt += '\n'
     }
 
+    // Add tool memory recommendations if available
+    if (finalToolRecommendations && finalToolRecommendations.recommendedTools.length > 0) {
+      prompt += '## AI-Powered Tool Recommendations\n\n'
+      prompt += '🚨 IMPORTANT: These tools have been intelligently recommended based on similar successful patterns.\n\n'
+      prompt += 'Prioritize these tools when creating your plan:\n\n'
+      
+      // Sort by priority
+      const sortedTools = [...finalToolRecommendations.recommendedTools].sort(
+        (a, b) => b.priority - a.priority
+      )
+      
+      for (const rec of sortedTools) {
+        prompt += `- **${rec.toolName}** (Priority: ${(rec.priority * 100).toFixed(0)}%)\n`
+        prompt += `  Rationale: ${rec.rationale}\n`
+        if (rec.exampleUsage) {
+          prompt += `  Example: "${rec.exampleUsage}"\n`
+        }
+        if (rec.toolChain && rec.toolChain.length > 0) {
+          prompt += `  Works well with: ${rec.toolChain.join(', ')}\n`
+        }
+        prompt += '\n'
+      }
+
+      if (finalToolRecommendations.toolChains.length > 0) {
+        prompt += '### Recommended Tool Chains\n\n'
+        for (const chain of finalToolRecommendations.toolChains) {
+          prompt += `- ${chain.sequence.join(' → ')}\n`
+          prompt += `  Rationale: ${chain.rationale}\n`
+          if (chain.successRate !== undefined) {
+            prompt += `  Success Rate: ${(chain.successRate * 100).toFixed(0)}%\n`
+          }
+          prompt += '\n'
+        }
+      }
+
+      prompt += '\n'
+    }
+
+    // Add expanded prompt steps if available
+    if (expandedPromptSteps.length > 0) {
+      prompt += '## Expanded Workflow Steps (From Recommended Prompts)\n\n'
+      prompt += '🚨 HIGH PRIORITY: These steps have been automatically generated from recommended MCP prompts.\n'
+      prompt += 'You should prioritize incorporating these steps into your plan when they align with the user query.\n\n'
+      
+      for (const step of expandedPromptSteps) {
+        prompt += `**Step ${step.order}: ${step.description}**\n`
+        prompt += `- Action: ${step.action}\n`
+        if (step.parameters && Object.keys(step.parameters).length > 0) {
+          prompt += `- Parameters: ${JSON.stringify(step.parameters)}\n`
+        }
+        prompt += `- Expected Outcome: ${step.expectedOutcome}\n`
+        if (step.dependencies && step.dependencies.length > 0) {
+          prompt += `- Dependencies: ${step.dependencies.join(', ')}\n`
+        }
+        prompt += '\n'
+      }
+      
+      prompt += '⚠️ IMPORTANT: When creating your plan, consider these expanded steps and integrate them appropriately.\n'
+      prompt += 'You can modify, reorder, or combine them with other steps as needed.\n\n'
+    }
+
     // Add similar examples context (vector-based learning)
-    if (similarExamples.length > 0) {
+    if (finalExamples.length > 0) {
       prompt += '## Similar Successful Plans\n\n'
       prompt += 'Learn parameter extraction patterns from these proven examples:\n\n'
 
-      for (const { example, similarity } of similarExamples) {
+      for (const { example, similarity } of finalExamples) {
         prompt += `### Example (${(similarity * 100).toFixed(0)}% similar): "${example.query}"\n`
         prompt += `Goal: ${example.goal}\n`
         
@@ -474,6 +655,361 @@ Remember: You are outputting JSON only, no text before or after the JSON object.
   }
 
   /**
+   * Fetch prompt content from MCP server
+   * 
+   * @param promptName - Name of the prompt to fetch
+   * @param args - Optional arguments for the prompt
+   * @returns Prompt content or null if fetch fails
+   */
+  private async fetchPromptContent(
+    promptName: string,
+    args: Record<string, any> = {}
+  ): Promise<any | null> {
+    try {
+      const promptContent = await getMCPPrompt(promptName, args)
+      logger.debug(`[PlannerAgent] Fetched prompt content`, {
+        promptName,
+        hasContent: !!promptContent,
+      })
+      return promptContent
+    } catch (error: any) {
+      logger.warn(`[PlannerAgent] Failed to fetch prompt content`, {
+        promptName,
+        error: error.message,
+      })
+      return null
+    }
+  }
+
+  /**
+   * Expand any prompt actions found in the plan into tool steps
+   * 
+   * This is a safety mechanism to ensure prompts are always expanded,
+   * even if the LLM used a prompt name directly instead of using expanded steps.
+   * 
+   * @param plan - Plan that may contain prompt actions
+   * @param userQuery - User query for context
+   * @param mcpContext - MCP context with available prompts
+   * @returns Plan with prompt actions replaced by tool steps
+   */
+  private async expandPromptActionsInPlan(
+    plan: Plan,
+    userQuery: string,
+    mcpContext: MCPContext
+  ): Promise<Plan> {
+    // Build prompt map for quick lookup
+    const promptMap = new Map(mcpContext.prompts.map(p => [p.name, p]))
+    const toolMap = new Map(mcpContext.tools.map(t => [t.name, t]))
+    
+    // Find steps that are prompts (not tools)
+    const promptSteps: Array<{ step: PlanStep; index: number }> = []
+    for (let i = 0; i < plan.steps.length; i++) {
+      const step = plan.steps[i]
+      // Skip if it's a tool or manual action
+      if (toolMap.has(step.action) || 
+          step.action.toLowerCase().includes('manual') ||
+          step.action === 'unknown') {
+        continue
+      }
+      
+      // Check if it's a prompt
+      if (promptMap.has(step.action)) {
+        promptSteps.push({ step, index: i })
+      }
+    }
+    
+    // If no prompt actions found, return plan as-is
+    if (promptSteps.length === 0) {
+      return plan
+    }
+    
+    logger.info(`[PlannerAgent] Found ${promptSteps.length} prompt action(s) in plan, expanding them`, {
+      promptActions: promptSteps.map(p => p.step.action),
+    })
+    
+    // Expand each prompt step and replace in plan
+    const newSteps: PlanStep[] = []
+    let currentOrder = 1
+    
+    for (let i = 0; i < plan.steps.length; i++) {
+      const promptStep = promptSteps.find(p => p.index === i)
+      
+      if (promptStep) {
+        // This step is a prompt - expand it
+        try {
+          const expanded = await this.expandPromptsToToolSteps(
+            [promptStep.step.action],
+            userQuery,
+            mcpContext
+          )
+          
+          if (expanded.length > 0) {
+            const baseStepOrder = currentOrder
+            const expandedStepsToAdd: PlanStep[] = []
+            
+            // First pass: normalize and filter expanded steps
+            for (let idx = 0; idx < expanded.length; idx++) {
+              const expStep = expanded[idx]
+              
+              // Skip MANUAL_STEP actions - they're not executable
+              if (expStep.action === 'MANUAL_STEP' || expStep.action.toLowerCase().includes('manual')) {
+                logger.debug(`[PlannerAgent] Skipping manual step in expanded prompt`, {
+                  stepDescription: expStep.description,
+                })
+                continue
+              }
+              
+              // Normalize dependencies to step-X format
+              // Dependencies in expanded steps can be:
+              // 1. Numbers (1, 2, 3) - these are absolute step order references in the final plan
+              // 2. Strings like "step-1", "step-2" - already in correct format
+              // 3. Number strings like "1", "2" - convert to step-X format
+              const normalizedDependencies = (expStep.dependencies || []).map((dep: any) => {
+                if (typeof dep === 'number') {
+                  // Convert number to step-X format (assume absolute step order reference)
+                  return `step-${dep}`
+                } else if (typeof dep === 'string') {
+                  // If already in step-X format, keep it
+                  if (dep.startsWith('step-')) {
+                    return dep
+                  }
+                  // If it's just a number string, convert it
+                  const numMatch = dep.match(/^(\d+)$/)
+                  if (numMatch) {
+                    return `step-${numMatch[1]}`
+                  }
+                  return dep
+                }
+                return dep
+              }).filter((dep: string) => typeof dep === 'string' && dep.length > 0)
+              
+              expandedStepsToAdd.push({
+                ...expStep,
+                id: `step-${currentOrder}`, // Always use step-X format
+                order: currentOrder++,
+                dependencies: normalizedDependencies,
+              })
+            }
+            
+            // Add all expanded steps
+            newSteps.push(...expandedStepsToAdd)
+            
+            logger.info(`[PlannerAgent] Expanded prompt "${promptStep.step.action}" into ${expandedStepsToAdd.length} tool steps`, {
+              originalStep: promptStep.step.order,
+              expandedSteps: expandedStepsToAdd.length,
+              filteredOut: expanded.length - expandedStepsToAdd.length,
+              finalStepRange: `${baseStepOrder} to ${currentOrder - 1}`,
+            })
+          } else {
+            // Expansion failed, keep original step but log warning
+            logger.warn(`[PlannerAgent] Failed to expand prompt "${promptStep.step.action}", keeping original step`, {
+              stepOrder: promptStep.step.order,
+            })
+            newSteps.push({
+              ...promptStep.step,
+              id: promptStep.step.id || `step-${currentOrder}`,
+              order: currentOrder++,
+            })
+          }
+        } catch (error: any) {
+          logger.error(`[PlannerAgent] Error expanding prompt "${promptStep.step.action}"`, {
+            error: error.message,
+            stepOrder: promptStep.step.order,
+          })
+          // Keep original step on error
+          newSteps.push({
+            ...promptStep.step,
+            id: promptStep.step.id || `step-${currentOrder}`,
+            order: currentOrder++,
+          })
+        }
+      } else {
+        // Regular step - keep it but adjust order
+        newSteps.push({
+          ...plan.steps[i],
+          id: plan.steps[i].id || `step-${currentOrder}`,
+          order: currentOrder++,
+        })
+      }
+    }
+    
+    return {
+      ...plan,
+      steps: newSteps,
+    }
+  }
+
+  /**
+   * Expand MCP prompts into concrete tool steps
+   * 
+   * Fetches prompt content and uses LLM to convert workflow templates
+   * into executable plan steps using actual MCP tools.
+   * 
+   * @param promptNames - Array of prompt names to expand
+   * @param userQuery - Original user query for context
+   * @param mcpContext - MCP context with available tools
+   * @returns Array of plan steps derived from prompts
+   */
+  private async expandPromptsToToolSteps(
+    promptNames: string[],
+    userQuery: string,
+    mcpContext: MCPContext
+  ): Promise<PlanStep[]> {
+    if (promptNames.length === 0) {
+      return []
+    }
+
+    const expandedSteps: PlanStep[] = []
+    let stepOrder = 1
+
+    for (const promptName of promptNames) {
+      try {
+        // Fetch prompt content
+        const promptContent = await this.fetchPromptContent(promptName)
+        if (!promptContent) {
+          logger.warn(`[PlannerAgent] Skipping prompt expansion for ${promptName} - content not available`)
+          continue
+        }
+
+        // Use LLM to convert prompt workflow into concrete tool steps
+        const expansionPrompt = `You are a plan expansion assistant. Your job is to convert an MCP prompt workflow into concrete tool steps.
+
+User Query: "${userQuery}"
+
+MCP Prompt Name: "${promptName}"
+Prompt Content:
+${typeof promptContent === 'string' ? promptContent : JSON.stringify(promptContent, null, 2)}
+
+Available MCP Tools:
+${mcpContext.tools.map(t => `- ${t.name}: ${t.description}`).join('\n')}
+
+Convert this prompt workflow into concrete plan steps using ONLY the available MCP tools listed above.
+
+Respond with ONLY a JSON array of plan steps in this format:
+[
+  {
+    "order": 1,
+    "description": "Clear step description",
+    "action": "exact_tool_name_from_available_tools",
+    "parameters": {
+      "exact_parameter_name": "extracted_value_or_placeholder"
+    },
+    "expectedOutcome": "What should happen",
+    "dependencies": []
+  }
+]
+
+CRITICAL RULES:
+1. Use EXACT tool names from the available tools list above
+2. Use EXACT parameter names from tool schemas
+3. Extract parameter values from user query when possible
+4. Use placeholders like "REQUIRED" or "EXTRACT_FROM_STEP_X" when values are unknown
+5. Set proper dependencies between steps using "step-X" format (e.g., ["step-1", "step-2"])
+6. DO NOT invent tool names or use tools not in the available list
+7. DO NOT use "MANUAL_STEP" or any manual actions - all steps must be executable tools
+8. DO NOT create manual/correlation steps - use actual tools or omit the step`
+
+        const messages = [
+          {
+            role: 'system' as const,
+            content: 'You are a plan expansion assistant. Convert prompt workflows into executable tool steps. Respond with ONLY valid JSON arrays.',
+          },
+          {
+            role: 'user' as const,
+            content: expansionPrompt,
+          },
+        ]
+
+        const response = await this.callLLM(messages, {
+          temperature: 0.3, // Low temperature for structured output
+          maxTokens: 2000,
+          // Note: We want JSON array, not json_object, so don't use responseFormat
+        })
+
+        // Parse response to extract steps
+        let parsedSteps: any[] = []
+        try {
+          // Try to extract JSON array from response
+          const jsonMatch = response.match(/\[[\s\S]*\]/)?.[0]
+          if (jsonMatch) {
+            parsedSteps = JSON.parse(jsonMatch)
+          } else {
+            // Try parsing entire response as JSON
+            const parsed = JSON.parse(response)
+            if (Array.isArray(parsed)) {
+              parsedSteps = parsed
+            } else if (parsed.steps && Array.isArray(parsed.steps)) {
+              parsedSteps = parsed.steps
+            }
+          }
+        } catch (parseError: any) {
+          logger.warn(`[PlannerAgent] Failed to parse expanded steps for prompt ${promptName}`, {
+            error: parseError.message,
+            response: response.substring(0, 200),
+          })
+          continue
+        }
+
+        // Convert parsed steps to PlanStep format
+        for (const step of parsedSteps) {
+          if (!step.action || !step.description) {
+            continue // Skip invalid steps
+          }
+          
+          // Skip MANUAL_STEP actions - they're not executable
+          if (step.action === 'MANUAL_STEP' || step.action.toLowerCase().includes('manual')) {
+            logger.debug(`[PlannerAgent] Skipping manual step in prompt expansion`, {
+              promptName,
+              stepDescription: step.description,
+            })
+            continue
+          }
+
+          // Normalize dependencies to step-X format
+          const normalizedDependencies = (step.dependencies || []).map((dep: any) => {
+            if (typeof dep === 'number') {
+              return `step-${dep}`
+            } else if (typeof dep === 'string') {
+              if (dep.startsWith('step-')) {
+                return dep
+              }
+              const numMatch = dep.match(/^(\d+)$/)
+              if (numMatch) {
+                return `step-${numMatch[1]}`
+              }
+              return dep
+            }
+            return dep
+          })
+
+          expandedSteps.push({
+            id: `expanded-${promptName}-${stepOrder}`, // Temporary ID, will be normalized later
+            order: stepOrder++,
+            description: step.description,
+            action: step.action,
+            parameters: step.parameters || {},
+            expectedOutcome: step.expectedOutcome || 'Execute workflow step',
+            dependencies: normalizedDependencies,
+            status: 'pending' as const,
+          })
+        }
+
+        logger.debug(`[PlannerAgent] Expanded prompt to steps`, {
+          promptName,
+          stepsGenerated: parsedSteps.length,
+        })
+      } catch (error: any) {
+        logger.warn(`[PlannerAgent] Failed to expand prompt ${promptName}`, {
+          error: error.message,
+        })
+        // Continue with other prompts even if one fails
+      }
+    }
+
+    return expandedSteps
+  }
+
+  /**
    * Generate a plan from thoughts
    * 
    * Enhanced with MCP context and semantic memory.
@@ -483,6 +1019,9 @@ Remember: You are outputting JSON only, no text before or after the JSON object.
    * @param requestContext - Request ID context from Thought Agent
    * @param mcpContext - Optional MCP context (will be fetched if not provided)
    * @param similarExamples - Optional similar examples (will be fetched if not provided)
+   * @param toolRecommendations - Optional tool recommendations (will be fetched if not provided)
+   * @param complexityScore - Optional complexity score for tool recommendations
+   * @param thoughtOutput - Optional ThoughtAgentOutput containing recommendedPrompts
    * @returns PlannerAgentOutput with structured plan
    */
   async generatePlan(
@@ -490,7 +1029,10 @@ Remember: You are outputting JSON only, no text before or after the JSON object.
     userQuery: string,
     requestContext: RequestContext,
     mcpContext?: MCPContext,
-    similarExamples?: Array<{ example: PlanExample; similarity: number }>
+    similarExamples?: Array<{ example: PlanExample; similarity: number }>,
+    toolRecommendations?: ToolMemoryOutput,
+    complexityScore?: ComplexityScore,
+    thoughtOutput?: ThoughtAgentOutput
   ): Promise<PlannerAgentOutput> {
     // Step 1: Add this agent to the request chain
     const updatedContext = this.addToChain(requestContext)
@@ -499,8 +1041,66 @@ Remember: You are outputting JSON only, no text before or after the JSON object.
     const contextToUse = mcpContext || await this.fetchMCPContext()
     const examplesToUse = similarExamples || await this.fetchSemanticContext(userQuery)
 
-    // Step 3: Build enhanced system prompt
-    const enhancedSystemPrompt = this.buildEnhancedSystemPrompt(contextToUse, examplesToUse)
+    // Step 2.5: Fetch tool recommendations if not provided
+    let toolRecs = toolRecommendations
+    if (!toolRecs) {
+      // Extract complexity from request context if available
+      const complexity = complexityScore || ((requestContext as any).metadata?.complexity as ComplexityScore | undefined)
+      toolRecs = await this.fetchToolRecommendations(userQuery, updatedContext, complexity) || undefined
+    }
+
+    // Step 2.6: Expand recommended prompts into tool steps
+    let expandedPromptSteps: PlanStep[] = []
+    if (thoughtOutput?.recommendedPrompts && thoughtOutput.recommendedPrompts.length > 0) {
+      logger.debug(`[PlannerAgent] Expanding recommended prompts to tool steps`, {
+        requestId: updatedContext.requestId,
+        promptCount: thoughtOutput.recommendedPrompts.length,
+        prompts: thoughtOutput.recommendedPrompts,
+      })
+      expandedPromptSteps = await this.expandPromptsToToolSteps(
+        thoughtOutput.recommendedPrompts,
+        userQuery,
+        contextToUse
+      )
+      logger.info(`[PlannerAgent] Expanded prompts into tool steps`, {
+        requestId: updatedContext.requestId,
+        promptsExpanded: thoughtOutput.recommendedPrompts.length,
+        stepsGenerated: expandedPromptSteps.length,
+      })
+    }
+
+    // Step 3: Build enhanced system prompt with optional compression
+    // Check if compression should be applied based on agent config or provider
+    const forceCompression = this.agentConfig?.parameters?.forceCompression || false
+    
+    // Always compress for Groq (strict token limits)
+    if (!this.apiConfig) {
+      throw new Error('Agent not initialized')
+    }
+    const { getProviderForModel } = await import('@/lib/ai-config')
+    const provider = getProviderForModel(this.apiConfig.modelId)
+    const isGroq = provider === 'groq'
+    
+    // Only compress if forced OR if we're actually near token limits
+    // Don't compress just because we're using Groq - only compress when needed
+    const shouldCompress = forceCompression
+    
+    const compressionConfig: CompressionConfig | undefined = shouldCompress ? {
+      maxTools: isGroq ? 12 : 15,  // Less aggressive - preserve more tools
+      maxExamples: isGroq ? 3 : 4, // Less aggressive - preserve more examples
+      maxRecommendations: isGroq ? 4 : 5,
+      truncateDescriptions: true,
+      maxDescriptionLength: isGroq ? 200 : 250, // Longer descriptions to preserve context
+      keepOnlyRequiredParams: false,  // Keep important optional params (filters, etc.)
+    } : undefined
+
+    const enhancedSystemPrompt = this.buildEnhancedSystemPrompt(
+      contextToUse,
+      examplesToUse,
+      toolRecs || undefined,
+      compressionConfig,
+      expandedPromptSteps
+    )
 
     // Step 4: Build the prompt for the LLM
     const prompt = this.buildPlanningPrompt(thoughts, userQuery, contextToUse)
@@ -530,8 +1130,12 @@ Remember: You are outputting JSON only, no text before or after the JSON object.
     // Step 6.5: Normalize invalid tool names (e.g., functions.get_facility -> get_facility)
     const normalizedPlan = this.normalizeToolNames(plan, contextToUse)
 
+    // Step 6.6: Expand any prompt actions that made it into the plan
+    // This ensures prompts are always expanded into tool steps, never passed to executor
+    const finalPlan = await this.expandPromptActionsInPlan(normalizedPlan, userQuery, contextToUse)
+
     // Step 7: Validate plan against MCP tool schemas
-    const validationResults = this.validatePlan(normalizedPlan, contextToUse)
+    const validationResults = this.validatePlan(finalPlan, contextToUse)
     if (validationResults.warnings.length > 0 || validationResults.errors.length > 0) {
       logger.warn(`[PlannerAgent] Plan validation issues`, {
         requestId: updatedContext.requestId,
@@ -555,16 +1159,16 @@ Remember: You are outputting JSON only, no text before or after the JSON object.
       requestContext: updatedContext,
 
       // Planner-specific output
-      plan: normalizedPlan,
+      plan: finalPlan,
       rationale,
       basedOnThoughts: thoughts.map(t => t.id),
     }
 
     logger.info(`[PlannerAgent] Generated plan`, {
       requestId: output.requestId,
-      stepsCount: normalizedPlan.steps.length,
-      confidence: normalizedPlan.confidence.toFixed(2),
-      complexity: normalizedPlan.estimatedComplexity.toFixed(2),
+      stepsCount: finalPlan.steps.length,
+      confidence: finalPlan.confidence.toFixed(2),
+      complexity: finalPlan.estimatedComplexity.toFixed(2),
     })
 
     return output

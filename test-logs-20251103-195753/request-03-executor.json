@@ -1,0 +1,104 @@
+{
+  "requestId": "b4259b78-ea1b-49e7-aff7-6f0d939a4a1e",
+  "agentName": "executor-agent",
+  "timestamp": "2025-11-03T19:01:19.814Z",
+  "requestContext": {
+    "requestId": "b4259b78-ea1b-49e7-aff7-6f0d939a4a1e",
+    "createdAt": "2025-11-03T19:00:47.332Z",
+    "agentChain": [
+      "complexity-detector",
+      "thought-agent",
+      "planner-agent",
+      "critic-agent"
+    ],
+    "status": "completed",
+    "userQuery": "List facilities in New York"
+  },
+  "executionResult": {
+    "planId": "plan-1762196465919",
+    "overallSuccess": true,
+    "steps": [
+      {
+        "stepId": "step-1",
+        "stepOrder": 1,
+        "success": true,
+        "result": [
+          {
+            "_id": "6905db9211cc522275d5f013",
+            "name": "Hannover",
+            "shortCode": "HAN",
+            "location": "New York, NY",
+            "createdAt": "2025-11-01T10:06:10.354Z",
+            "updatedAt": "2025-11-01T11:07:26.248Z",
+            "__v": 0
+          },
+          {
+            "_id": "690605d1279af4bcf42f9ea2",
+            "name": "Central Waste Processing Hub",
+            "shortCode": "CWP",
+            "location": "New York, NY",
+            "createdAt": "2025-11-01T13:06:25.054Z",
+            "updatedAt": "2025-11-01T13:06:34.941Z",
+            "__v": 0
+          },
+          {
+            "_id": "6908eae0894ded4128bcbd07",
+            "name": "Test Facility Alpha",
+            "shortCode": "TFA-001",
+            "location": "New York, NY",
+            "createdAt": "2025-11-03T17:48:16.911Z",
+            "updatedAt": "2025-11-03T17:48:16.911Z",
+            "__v": 0
+          }
+        ],
+        "duration": 3644,
+        "retries": 0,
+        "timestamp": "2025-11-03T19:01:17.138Z",
+        "toolCalled": "list_facilities",
+        "parametersUsed": {
+          "location": "New York"
+        }
+      }
+    ],
+    "partialResults": {
+      "step-1": [
+        {
+          "_id": "6905db9211cc522275d5f013",
+          "name": "Hannover",
+          "shortCode": "HAN",
+          "location": "New York, NY",
+          "createdAt": "2025-11-01T10:06:10.354Z",
+          "updatedAt": "2025-11-01T11:07:26.248Z",
+          "__v": 0
+        },
+        {
+          "_id": "690605d1279af4bcf42f9ea2",
+          "name": "Central Waste Processing Hub",
+          "shortCode": "CWP",
+          "location": "New York, NY",
+          "createdAt": "2025-11-01T13:06:25.054Z",
+          "updatedAt": "2025-11-01T13:06:34.941Z",
+          "__v": 0
+        },
+        {
+          "_id": "6908eae0894ded4128bcbd07",
+          "name": "Test Facility Alpha",
+          "shortCode": "TFA-001",
+          "location": "New York, NY",
+          "createdAt": "2025-11-03T17:48:16.911Z",
+          "updatedAt": "2025-11-03T17:48:16.911Z",
+          "__v": 0
+        }
+      ]
+    },
+    "errors": [],
+    "totalDuration": 6320,
+    "questionsAsked": [],
+    "adaptations": []
+  },
+  "planId": "plan-1762196465919",
+  "requiresUserFeedback": false,
+  "critiqueAvailable": true,
+  "critiqueRecommendation": "approve",
+  "executionVersion": 1
+}

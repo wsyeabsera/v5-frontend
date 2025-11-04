@@ -1,0 +1,1 @@
+{"requestId":"354a5ae6-1c7c-4186-b499-3e9c5fe37272","createdAt":"2025-11-03T18:58:32.087Z","agentChain":["complexity-detector","thought-agent","planner-agent","critic-agent"],"status":"completed","userQuery":"Show me all facilities"}

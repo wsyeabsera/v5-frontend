@@ -260,3 +260,46 @@ export async function getRequestsWithPlannerAgent(): Promise<(RequestContext & {
   }))
 }
 
+/**
+ * Initialize MongoDB indexes for requests collection
+ */
+export async function initRequests(): Promise<{ message: string }> {
+  const response = await fetch(`${API_BASE}/init`, {
+    method: 'POST',
+  })
+
+  if (!response.ok) {
+    const error = await response.json()
+    throw new Error(error.error || `Failed to initialize requests: ${response.statusText}`)
+  }
+
+  return response.json()
+}
+
+/**
+ * Reset demo data - clears all data and seeds demo requests
+ */
+export async function resetDemoData(): Promise<{
+  success: boolean
+  message: string
+  stats: {
+    requestsCreated: number
+    requestsFailed: number
+    totalQueries: number
+    toolCoverageRequests: number
+    promptRequests: number
+    mcpPromptsFetched: number
+  }
+}> {
+  const response = await fetch('/api/demo/reset', {
+    method: 'POST',
+  })
+
+  if (!response.ok) {
+    const error = await response.json()
+    throw new Error(error.error || `Failed to reset demo data: ${response.statusText}`)
+  }
+
+  return response.json()
+}
+

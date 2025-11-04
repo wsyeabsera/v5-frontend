@@ -1,0 +1,55 @@
+{
+  "requestId": "5cc8dac1-4851-4e5d-8c6f-6dceeff3e226",
+  "agentName": "planner-agent",
+  "timestamp": "2025-11-03T19:01:35.055Z",
+  "requestContext": {
+    "requestId": "5cc8dac1-4851-4e5d-8c6f-6dceeff3e226",
+    "createdAt": "2025-11-03T19:01:20.918Z",
+    "agentChain": [
+      "complexity-detector",
+      "thought-agent",
+      "planner-agent"
+    ],
+    "status": "completed",
+    "userQuery": "Get details for facility HAN"
+  },
+  "plan": {
+    "id": "plan-1762196495054",
+    "goal": "Get details for facility with shortCode 'HAN'",
+    "steps": [
+      {
+        "id": "step-1",
+        "order": 1,
+        "description": "Retrieve facility ID for shortCode 'HAN'",
+        "action": "list_facilities",
+        "parameters": {
+          "shortCode": "HAN"
+        },
+        "expectedOutcome": "Retrieve the facility ID for the facility with shortCode 'HAN'",
+        "dependencies": [],
+        "status": "pending"
+      },
+      {
+        "id": "step-2",
+        "order": 2,
+        "description": "Get details of the facility with ID 'HAN'",
+        "action": "get_facility",
+        "parameters": {
+          "id": "EXTRACT_FROM_STEP_1"
+        },
+        "expectedOutcome": "Retrieve detailed information for the facility with ID 'HAN'",
+        "dependencies": [],
+        "status": "pending"
+      }
+    ],
+    "estimatedComplexity": 0.7,
+    "confidence": 0.9,
+    "dependencies": [],
+    "createdAt": "2025-11-03T19:01:35.054Z",
+    "planVersion": 1
+  },
+  "rationale": "Plan created based on reasoning thoughts.",
+  "basedOnThoughts": [
+    "thought-1762196485524-1"
+  ]
+}

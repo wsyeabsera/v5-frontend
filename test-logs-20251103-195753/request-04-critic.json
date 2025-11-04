@@ -1,0 +1,39 @@
+{
+  "requestId": "5cc8dac1-4851-4e5d-8c6f-6dceeff3e226",
+  "agentName": "critic-agent",
+  "timestamp": "2025-11-03T19:01:43.997Z",
+  "requestContext": {
+    "requestId": "5cc8dac1-4851-4e5d-8c6f-6dceeff3e226",
+    "createdAt": "2025-11-03T19:01:20.918Z",
+    "agentChain": [
+      "complexity-detector",
+      "thought-agent",
+      "planner-agent",
+      "critic-agent"
+    ],
+    "status": "completed",
+    "userQuery": "Get details for facility HAN"
+  },
+  "critique": {
+    "id": "critique-1762196503996",
+    "planId": "plan-1762196495054",
+    "overallScore": 0.9,
+    "feasibilityScore": 1,
+    "correctnessScore": 1,
+    "efficiencyScore": 0.9,
+    "safetyScore": 1,
+    "issues": [],
+    "followUpQuestions": [],
+    "strengths": [
+      "Clear goal to get details for facility with shortCode 'HAN'",
+      "Logical sequence of steps"
+    ],
+    "suggestions": [],
+    "recommendation": "approve",
+    "rationale": "The plan is feasible, correct, and safe. It efficiently achieves the goal of retrieving details for the facility with shortCode 'HAN'."
+  },
+  "planId": "plan-1762196495054",
+  "requiresUserFeedback": false,
+  "validationWarnings": [],
+  "critiqueVersion": 1
+}

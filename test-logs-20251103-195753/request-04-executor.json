@@ -1,0 +1,91 @@
+{
+  "requestId": "5cc8dac1-4851-4e5d-8c6f-6dceeff3e226",
+  "agentName": "executor-agent",
+  "timestamp": "2025-11-03T19:01:55.391Z",
+  "requestContext": {
+    "requestId": "5cc8dac1-4851-4e5d-8c6f-6dceeff3e226",
+    "createdAt": "2025-11-03T19:01:20.918Z",
+    "agentChain": [
+      "complexity-detector",
+      "thought-agent",
+      "planner-agent",
+      "critic-agent"
+    ],
+    "status": "failed",
+    "userQuery": "Get details for facility HAN"
+  },
+  "executionResult": {
+    "planId": "plan-1762196495054",
+    "overallSuccess": false,
+    "steps": [
+      {
+        "stepId": "step-1",
+        "stepOrder": 1,
+        "success": true,
+        "result": [
+          {
+            "_id": "6905db9211cc522275d5f013",
+            "name": "Hannover",
+            "shortCode": "HAN",
+            "location": "New York, NY",
+            "createdAt": "2025-11-01T10:06:10.354Z",
+            "updatedAt": "2025-11-01T11:07:26.248Z",
+            "__v": 0
+          }
+        ],
+        "duration": 1158,
+        "retries": 0,
+        "timestamp": "2025-11-03T19:01:45.232Z",
+        "toolCalled": "list_facilities",
+        "parametersUsed": {
+          "shortCode": "HAN"
+        }
+      },
+      {
+        "stepId": "step-2",
+        "stepOrder": 2,
+        "success": false,
+        "error": "Cannot execute step: parameters contain placeholder values that were not extracted",
+        "errorType": "coordination-error",
+        "duration": 3396,
+        "retries": 0,
+        "timestamp": "2025-11-03T19:01:49.907Z",
+        "toolCalled": "get_facility",
+        "parametersUsed": {
+          "id": "EXTRACT_FROM_STEP_1"
+        }
+      }
+    ],
+    "partialResults": {
+      "step-1": [
+        {
+          "_id": "6905db9211cc522275d5f013",
+          "name": "Hannover",
+          "shortCode": "HAN",
+          "location": "New York, NY",
+          "createdAt": "2025-11-01T10:06:10.354Z",
+          "updatedAt": "2025-11-01T11:07:26.248Z",
+          "__v": 0
+        }
+      ]
+    },
+    "errors": [
+      "Step 2: Cannot execute step: parameters contain placeholder values that were not extracted"
+    ],
+    "totalDuration": 11317,
+    "questionsAsked": [],
+    "adaptations": [
+      {
+        "stepId": "step-2",
+        "originalAction": "get_facility",
+        "adaptedAction": "list_facilities",
+        "reason": "Retrieve the facility ID by searching for the facility with shortCode 'HAN'"
+      }
+    ]
+  },
+  "planId": "plan-1762196495054",
+  "requiresUserFeedback": false,
+  "critiqueAvailable": true,
+  "critiqueRecommendation": "approve",
+  "executionVersion": 1
+}

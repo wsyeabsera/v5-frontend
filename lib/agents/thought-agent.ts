@@ -57,13 +57,18 @@ ASSUMPTIONS: [Assumptions you're making]
 
 UNCERTAINTIES: [What you're uncertain about]
 
-TOOLS: [Which specific tools might help, with rationale]
+TOOLS: [Which specific tools and workflow templates might help, with rationale]
 
-When recommending tools:
-- Provide specific function calls with example arguments
-- Example: "Use generate_intelligent_facility_report(facilityId: 'ABC') to get comprehensive analysis"
-- Chain tools when needed: "First list_facilities(), then for each facility call analyze_shipment_risk(shipmentId: ...)"
-- Explain why each tool is appropriate for the query`
+When recommending tools and workflows:
+- **For Tools**: Provide specific function calls with example arguments
+  - Example: "Use generate_intelligent_facility_report(facilityId: 'ABC') to get comprehensive analysis"
+  - Chain tools when needed: "First list_facilities(), then for each facility call analyze_shipment_risk(shipmentId: ...)"
+- **For Workflow Templates/Prompts**: Mention the exact prompt name when a pre-built workflow is relevant
+  - Example: "Use the compare-facilities-performance workflow template to analyze multiple facilities"
+  - Example: "Leverage the analyze-facility-compliance prompt for comprehensive compliance analysis"
+  - When a workflow template matches the query, mention it by its exact name (e.g., "compare-facilities-performance", "analyze-facility-compliance")
+- Explain why each tool or workflow template is appropriate for the query
+- **IMPORTANT**: If a workflow template from the "Available Workflow Templates" section matches your query, include its exact name in the TOOLS section`
 
   constructor() {
     super('thought-agent')
@@ -186,13 +191,23 @@ When recommending tools:
     // Add MCP prompts context
     if (mcpContext.prompts.length > 0) {
       prompt += '## Available Workflow Templates\n\n'
-      prompt += 'These are pre-built analysis workflows you can leverage:\n\n'
+      prompt += '🚨 IMPORTANT: These are pre-built analysis workflows you can leverage.\n'
+      prompt += '**When a workflow template matches the user query, mention its EXACT name in the TOOLS section.**\n\n'
       
       for (const mcpPrompt of mcpContext.prompts) {
         prompt += `- **${mcpPrompt.name}**: ${mcpPrompt.description}\n`
       }
 
       prompt += '\n'
+      prompt += '**Examples of when to recommend workflow templates:**\n'
+      prompt += '- Query mentions "compare" or "performance" → consider "compare-facilities-performance"\n'
+      prompt += '- Query mentions "compliance" or "inspection" → consider "analyze-facility-compliance"\n'
+      prompt += '- Query mentions "contamination" or "report" → consider "generate-contamination-report"\n'
+      prompt += '- Query mentions "shipment" and "review" → consider "review-shipment-inspection"\n'
+      prompt += '\n'
+      prompt += '**When recommending a workflow template, use this format in TOOLS section:**\n'
+      prompt += '  "Use the [exact-prompt-name] workflow template to [what it does]"\n'
+      prompt += '  Example: "Use the compare-facilities-performance workflow template to analyze and compare multiple facilities"\n\n'
     }
 
     // Add similar examples context
@@ -406,11 +421,12 @@ When recommending tools:
     let toolRecs = toolRecommendations
     if (!toolRecs && context.complexity) {
       // Try to fetch from Tool Memory Agent
-      toolRecs = await this.fetchToolRecommendations(
+      const fetched = await this.fetchToolRecommendations(
         userQuery,
         updatedContext,
         context.complexity
       )
+      toolRecs = fetched || undefined
     }
 
     // Step 4: Build enhanced system prompt
@@ -445,8 +461,8 @@ When recommending tools:
     // Step 6: Parse the structured response
     const thought = this.parseThoughtResponse(response, userQuery, 1)
 
-    // Step 7: Extract recommended tools (match against actual MCP resources)
-    const recommendedTools = this.extractToolSuggestions(response, contextToUse)
+    // Step 7: Extract recommended tools and prompts (match against actual MCP resources)
+    const recommendations = this.extractToolSuggestions(response, contextToUse, userQuery)
 
     // Step 8: Build output with Request ID
     const output: ThoughtAgentOutput = {
@@ -460,7 +476,8 @@ When recommending tools:
       thoughts: [thought],
       primaryApproach: thought.approaches[0] || 'Unknown approach',
       keyInsights: this.extractKeyInsights(thought.reasoning),
-      recommendedTools,
+      recommendedTools: recommendations.tools,
+      recommendedPrompts: recommendations.prompts.length > 0 ? recommendations.prompts : undefined,
       complexityScore: context.complexityScore,
       reasoningPass: 1,
       totalPasses: context.reasoningPasses || 1,
@@ -545,6 +562,9 @@ Challenge your assumptions. Explore edge cases.`
 
     const thought = this.parseThoughtResponse(response, userQuery, passNumber)
 
+    // Extract recommended tools and prompts
+    const recommendations = this.extractToolSuggestions(response, mcpContext, userQuery)
+
     const output: ThoughtAgentOutput = {
       requestId: updatedContext.requestId,
       agentName: 'thought-agent',
@@ -553,7 +573,8 @@ Challenge your assumptions. Explore edge cases.`
       thoughts: [thought],
       primaryApproach: thought.approaches[0] || 'Unknown',
       keyInsights: this.extractKeyInsights(thought.reasoning),
-      recommendedTools: this.extractToolSuggestions(response, mcpContext),
+      recommendedTools: recommendations.tools,
+      recommendedPrompts: recommendations.prompts.length > 0 ? recommendations.prompts : undefined,
       reasoningPass: passNumber,
       totalPasses,
     }
@@ -632,19 +653,94 @@ Challenge your assumptions. Explore edge cases.`
   }
 
   /**
+   * Match prompts semantically based on user query
+   * 
+   * Uses keyword matching to find relevant prompts when they're not explicitly mentioned.
+   * 
+   * @param userQuery - User's query
+   * @param mcpContext - MCP context with available prompts
+   * @returns Array of prompt names that semantically match the query
+   */
+  private matchPromptsSemantically(
+    userQuery: string,
+    mcpContext: MCPContext
+  ): string[] {
+    if (mcpContext.prompts.length === 0) {
+      return []
+    }
+
+    const queryLower = userQuery.toLowerCase()
+    const matchedPrompts: string[] = []
+
+    // Define keyword mappings for each prompt
+    const promptKeywords: Record<string, string[]> = {
+      'compare-facilities-performance': ['compare', 'comparison', 'performance', 'benchmark', 'metrics', 'multiple facilities', 'across facilities'],
+      'analyze-facility-compliance': ['compliance', 'inspection', 'regulatory', 'violation', 'meets conditions', 'accepted'],
+      'generate-contamination-report': ['contamination', 'contaminant', 'report', 'waste item', 'detected'],
+      'review-shipment-inspection': ['shipment', 'review', 'inspection', 'delivery', 'accept'],
+      'analyze-facility-with-risks': ['risk', 'risky', 'hazard', 'danger', 'safety'],
+      'facility-report-with-recommendations': ['report', 'recommendation', 'suggest', 'advice', 'improve'],
+      'analyze-source-shipment-risks': ['source', 'origin', 'shipment risk', 'where from'],
+      'find-high-risk-contaminants-and-facilities': ['high risk', 'dangerous', 'explosive', 'hazardous', 'critical'],
+      'contaminant-to-shipment-analysis': ['contaminant', 'shipment', 'trace', 'track'],
+      'assess-facility-shipment-risks': ['assess', 'evaluate', 'risk assessment', 'facility risk'],
+      'assess-source-risk-profile': ['source risk', 'origin risk', 'profile'],
+      'analyze-high-explosive-contaminants': ['explosive', 'explosion', 'high explosive', 'bomb'],
+      'analyze-facilities-by-location': ['location', 'by location', 'in', 'at', 'facilities in', 'facilities at'],
+    }
+
+    // Check each prompt for keyword matches
+    for (const prompt of mcpContext.prompts) {
+      const promptName = prompt.name.toLowerCase()
+      const keywords = promptKeywords[prompt.name] || []
+      
+      // Check if query contains any keywords for this prompt
+      const hasKeywordMatch = keywords.some(keyword => queryLower.includes(keyword))
+      
+      // Also check if prompt description matches
+      const descriptionLower = prompt.description.toLowerCase()
+      const descriptionWords = descriptionLower.split(/\s+/)
+      const queryWords = queryLower.split(/\s+/)
+      
+      // Check for significant word overlap (at least 2 words)
+      const commonWords = descriptionWords.filter(word => 
+        word.length > 3 && queryWords.includes(word)
+      )
+      
+      if (hasKeywordMatch || commonWords.length >= 2) {
+        matchedPrompts.push(prompt.name)
+        logger.debug(`[ThoughtAgent] Semantically matched prompt`, {
+          promptName: prompt.name,
+          hasKeywordMatch,
+          commonWordsCount: commonWords.length,
+        })
+      }
+    }
+
+    return matchedPrompts
+  }
+
+  /**
    * Extract tool suggestions from LLM response
    * 
-   * The LLM might mention tools in its response.
-   * This extracts them for use by later agents.
+   * The LLM might mention tools and prompts in its response.
+   * This extracts them separately for use by later agents.
+   * Also includes semantic matching as fallback for prompts.
    * 
    * @param response - LLM response
-   * @returns Array of recommended tool names
+   * @param mcpContext - MCP context to match against
+   * @param userQuery - Original user query for semantic matching fallback
+   * @returns Object with separate arrays for tools and prompts
    */
-  private extractToolSuggestions(response: string, mcpContext: MCPContext): string[] {
+  private extractToolSuggestions(
+    response: string,
+    mcpContext: MCPContext,
+    userQuery?: string
+  ): { tools: string[]; prompts: string[] } {
     const toolsSection = this.extractSection(response, 'TOOLS')
-    if (!toolsSection) return []
-
-    const recommendations = new Set<string>()
+    
+    const toolRecommendations = new Set<string>()
+    const promptRecommendations = new Set<string>()
     
     // Build lookup maps (case-insensitive) from actual MCP server data
     const toolMap = new Map(mcpContext.tools.map(t => [t.name.toLowerCase(), t.name]))
@@ -655,22 +751,66 @@ Challenge your assumptions. Explore edge cases.`
         .filter(([k, v]) => k && v) as Array<[string, string]>
     )
     
-    // Extract all potential identifiers from the TOOLS section
-    // Match: words with underscores, hyphens, or alphanumeric sequences
-    const words = toolsSection.toLowerCase().match(/\b[a-z][a-z0-9_-]*[a-z0-9]\b/g) || []
-    
-    for (const word of words) {
-      // Check against all MCP resources (tools, prompts, resources)
-      if (toolMap.has(word)) {
-        recommendations.add(toolMap.get(word)!)
-      } else if (promptMap.has(word)) {
-        recommendations.add(promptMap.get(word)!)
-      } else if (resourceMap.has(word)) {
-        recommendations.add(resourceMap.get(word)!)
+    // Extract from TOOLS section if it exists
+    if (toolsSection) {
+      const toolsSectionLower = toolsSection.toLowerCase()
+      
+      // First, check for exact matches of tool/prompt names in the text
+      // This handles hyphenated names like "compare-facilities-performance"
+      for (const [lowerName, originalName] of Array.from(toolMap.entries())) {
+        if (toolsSectionLower.includes(lowerName)) {
+          toolRecommendations.add(originalName)
+        }
+      }
+      
+      for (const [lowerName, originalName] of Array.from(promptMap.entries())) {
+        if (toolsSectionLower.includes(lowerName)) {
+          promptRecommendations.add(originalName)
+        }
+      }
+      
+      for (const [lowerName, originalName] of Array.from(resourceMap.entries())) {
+        if (lowerName && toolsSectionLower.includes(lowerName)) {
+          toolRecommendations.add(originalName)
+        }
+      }
+      
+      // Also extract individual words for potential partial matches
+      // This helps catch cases where the LLM mentions just part of a name
+      const words = toolsSectionLower.match(/\b[a-z][a-z0-9_]*[a-z0-9]\b/g) || []
+      for (const word of words) {
+        // Skip if already matched as full name
+        if (toolMap.has(word) && !toolRecommendations.has(toolMap.get(word)!)) {
+          toolRecommendations.add(toolMap.get(word)!)
+        } else if (promptMap.has(word) && !promptRecommendations.has(promptMap.get(word)!)) {
+          promptRecommendations.add(promptMap.get(word)!)
+        } else if (resourceMap.has(word) && !toolRecommendations.has(resourceMap.get(word)!)) {
+          toolRecommendations.add(resourceMap.get(word)!)
+        }
       }
     }
     
-    return Array.from(recommendations)
+    // Semantic matching fallback: ALWAYS try semantic matching if userQuery is provided
+    // This ensures prompts are found even if LLM doesn't include TOOLS section or doesn't mention prompts explicitly
+    if (userQuery && (promptRecommendations.size === 0 || !toolsSection)) {
+      const semanticMatches = this.matchPromptsSemantically(userQuery, mcpContext)
+      for (const promptName of semanticMatches) {
+        promptRecommendations.add(promptName)
+      }
+      
+      if (semanticMatches.length > 0) {
+        logger.debug(`[ThoughtAgent] Used semantic matching to find prompts`, {
+          promptsFound: semanticMatches,
+          userQuery,
+          hadToolsSection: !!toolsSection,
+        })
+      }
+    }
+    
+    return {
+      tools: Array.from(toolRecommendations),
+      prompts: Array.from(promptRecommendations),
+    }
   }
 
   /**

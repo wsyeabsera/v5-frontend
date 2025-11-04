@@ -75,7 +75,7 @@ export function RequestCard({ request, onClick, className }: RequestCardProps) {
             )}
 
             {/* Agent Chain Preview */}
-            {request.agentChain.length > 0 && (
+            {request.agentChain && request.agentChain.length > 0 && (
               <div className="flex items-center gap-1.5 flex-wrap">
                 <span className="text-[11px] text-muted-foreground">Agents:</span>
                 <div className="flex items-center gap-1 flex-wrap">

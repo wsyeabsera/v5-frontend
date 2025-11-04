@@ -7,7 +7,7 @@
 import { BaseAgent } from '../base-agent'
 import { Plan, ExecutorAgentOutput, RequestContext, CriticAgentOutput, MCPContext } from '@/types'
 import { ExecutionEngine } from './core/execution-engine'
-import { listMCPTools } from '@/lib/mcp-prompts'
+import { listMCPTools, listMCPPrompts } from '@/lib/mcp-prompts'
 import { logger } from '@/utils/logger'
 
 export class ExecutorAgent extends BaseAgent {
@@ -19,20 +19,28 @@ export class ExecutorAgent extends BaseAgent {
   }
 
   /**
-   * Fetch MCP context (tools)
+   * Fetch MCP context (tools and prompts)
    */
   async fetchMCPContext(): Promise<MCPContext> {
     try {
-      const tools = await listMCPTools().catch(() => [])
+      const [tools, prompts] = await Promise.all([
+        listMCPTools().catch(() => []),
+        listMCPPrompts().catch(() => [])
+      ])
 
       logger.debug(`[ExecutorAgent] Fetched MCP context`, {
         toolsCount: tools.length,
+        promptsCount: prompts.length,
       })
 
       return {
         tools,
         resources: [],
-        prompts: [],
+        prompts: prompts.map(p => ({
+          name: p.name,
+          description: p.description,
+          arguments: p.arguments || [],
+        })),
       }
     } catch (error: any) {
       logger.warn(`[ExecutorAgent] Failed to fetch MCP context`, {
