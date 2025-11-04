@@ -1,6 +1,6 @@
 'use client'
 
-import { Sparkles, Brain, ListChecks, ShieldCheck, Play, FileText, ChevronRight, Info, X } from 'lucide-react'
+import { Sparkles, Brain, ListChecks, ShieldCheck, Play, FileText, ChevronRight, Info, X, BarChart } from 'lucide-react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -48,6 +48,13 @@ const pipelineAgents: PipelineAgent[] = [
     href: '/agents/critic-agent',
     icon: ShieldCheck,
     description: 'Evaluate plans for errors, risks, and completeness before execution',
+  },
+  {
+    id: 'confidence-scorer',
+    name: 'Confidence Scorer',
+    href: '/agents/confidence-scorer',
+    icon: BarChart,
+    description: 'Aggregate confidence scores from multiple agents and make routing decisions',
   },
   {
     id: 'executor-agent',
@@ -177,13 +184,14 @@ export function PipelineBanner({ currentAgent, requestId }: PipelineBannerProps)
               <h4 className="text-xs font-semibold mb-2">Pipeline Flow</h4>
               <div className="space-y-2 text-xs text-muted-foreground">
                 <p className="leading-relaxed">
-                  The agent pipeline processes requests through six stages. Each agent builds on the previous stage's output.
+                  The agent pipeline processes requests through seven stages. Each agent builds on the previous stage's output.
                 </p>
                 <ul className="space-y-1 list-disc list-inside ml-1">
                   <li><strong>Complexity Detector:</strong> Analyze and classify query complexity</li>
                   <li><strong>Thought Agent:</strong> Generate reasoning from complexity analysis</li>
                   <li><strong>Planner Agent:</strong> Create executable plans from thoughts</li>
                   <li><strong>Critic Agent:</strong> Evaluate plans for errors and completeness</li>
+                  <li><strong>Confidence Scorer:</strong> Aggregate confidence scores and make routing decisions</li>
                   <li><strong>Executor Agent:</strong> Execute plans with error handling and tool coordination</li>
                   <li><strong>Summary Agent:</strong> Generate human-readable summaries from thoughts and execution outputs</li>
                 </ul>

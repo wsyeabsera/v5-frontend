@@ -1,6 +1,6 @@
 'use client'
 
-import { Home, MessageSquare, Settings, ChevronLeft, ChevronRight, List, Sparkles, Database, Cpu, Brain, GraduationCap, ListChecks, ShieldCheck, Play, ChevronDown, FileText } from 'lucide-react'
+import { Home, MessageSquare, Settings, ChevronLeft, ChevronRight, List, Sparkles, Database, Cpu, Brain, GraduationCap, ListChecks, ShieldCheck, Play, ChevronDown, FileText, BarChart } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useState, useEffect } from 'react'
@@ -24,6 +24,7 @@ const navigation = [
       { name: 'Thought Agent', href: '/agents/thought-agent', icon: Brain },
       { name: 'Planner Agent', href: '/agents/planner-agent', icon: ListChecks },
       { name: 'Critic Agent', href: '/agents/critic-agent', icon: ShieldCheck },
+      { name: 'Confidence Scorer', href: '/agents/confidence-scorer', icon: BarChart },
       { name: 'Executor Agent', href: '/agents/executor-agent', icon: Play },
       { name: 'Summary Agent', href: '/agents/summary-agent', icon: FileText },
     ]

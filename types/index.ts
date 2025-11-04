@@ -557,6 +557,32 @@ export interface SummaryAgentOutput extends AgentOutput {
 }
 
 /**
+ * Confidence Score - Individual confidence score from an agent
+ */
+export interface ConfidenceScore {
+  agentName: string;
+  score: number; // 0.0-1.0
+  reasoning: string; // Why this confidence level
+  timestamp: Date;
+}
+
+/**
+ * Confidence Scorer Output
+ */
+export interface ConfidenceScorerOutput extends AgentOutput {
+  overallConfidence: number; // Aggregated score
+  agentScores: ConfidenceScore[];
+  decision: 'execute' | 'review' | 'rethink' | 'escalate';
+  thresholdUsed: {
+    execute: number;
+    review: number;
+    rethink: number;
+    escalate: number;
+  };
+  reasoning: string;
+}
+
+/**
  * Tool Recommendation - Individual tool recommendation with priority and rationale
  */
 export interface ToolRecommendation {

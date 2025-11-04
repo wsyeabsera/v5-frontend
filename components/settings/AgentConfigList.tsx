@@ -10,9 +10,22 @@ import { Loader2, AlertCircle, Plus } from 'lucide-react'
 
 export function AgentConfigList() {
   const [dialogOpen, setDialogOpen] = useState(false)
+  const [expandedCards, setExpandedCards] = useState<Set<string>>(new Set())
   const { data: configs, isLoading, error } = useAgentConfigs()
   const updateMutation = useUpdateAgentConfig()
   const deleteMutation = useDeleteAgentConfig()
+
+  const handleCardToggle = (agentId: string) => {
+    setExpandedCards((prev) => {
+      const next = new Set(prev)
+      if (next.has(agentId)) {
+        next.delete(agentId)
+      } else {
+        next.add(agentId)
+      }
+      return next
+    })
+  }
 
   const handleSave = async (config: AgentConfig) => {
     try {
@@ -105,6 +118,8 @@ export function AgentConfigList() {
               onDelete={handleDelete}
               isSaving={updateMutation.isPending}
               isDeleting={deleteMutation.isPending}
+              isExpanded={expandedCards.has(config.agentId)}
+              onToggle={() => handleCardToggle(config.agentId)}
             />
           </div>
         ))
