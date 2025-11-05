@@ -1,6 +1,6 @@
 'use client'
 
-import { Home, MessageSquare, Settings, ChevronLeft, ChevronRight, List, Sparkles, Database, Cpu, Brain, GraduationCap, ListChecks, ShieldCheck, Play, ChevronDown, FileText, BarChart, Eye, RotateCcw, Zap, Wrench, FolderOpen, Search, ListTodo, CheckSquare, GitBranch } from 'lucide-react'
+import { Settings, ChevronLeft, ChevronRight, MessageSquare, FileText, Brain, ListChecks, CheckSquare, GitBranch, Wrench, FolderOpen, Search, ListTodo, Zap, ChevronDown } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useState, useEffect } from 'react'
@@ -12,50 +12,23 @@ const navigation = [
   {
     group: 'Main',
     items: [
-      { name: 'Dashboard', href: '/', icon: Home },
-      { name: 'Chat', href: '/chat', icon: MessageSquare },
-      { name: 'Requests', href: '/requests', icon: List },
-    ]
-  },
-  {
-    group: 'Agent Pipeline',
-    items: [
-      { name: 'Complexity Detector', href: '/agents/complexity-detector', icon: Sparkles },
-      { name: 'Thought Agent', href: '/agents/thought-agent', icon: Brain },
-      { name: 'Planner Agent', href: '/agents/planner-agent', icon: ListChecks },
-      { name: 'Critic Agent', href: '/agents/critic-agent', icon: ShieldCheck },
-      { name: 'Confidence Scorer', href: '/agents/confidence-scorer', icon: BarChart },
-      { name: 'Meta Agent', href: '/agents/meta-agent', icon: Eye },
-      { name: 'Replan Agent', href: '/agents/replan-agent', icon: RotateCcw },
-      { name: 'Executor Agent', href: '/agents/executor-agent', icon: Play },
-      { name: 'Summary Agent', href: '/agents/summary-agent', icon: FileText },
-    ]
-  },
-  {
-    group: 'Training Data',
-    items: [
-      { name: 'Complexity Examples', href: '/agents/complexity-examples', icon: Database },
-      { name: 'Thought Examples', href: '/agents/thought-examples', icon: GraduationCap },
-      { name: 'Planner Examples', href: '/agents/planner-examples', icon: ListChecks },
-    ]
-  },
-  {
-    group: 'System',
-    items: [
-      { name: 'Base Agent', href: '/agents/base-agent', icon: Cpu },
-      { name: 'Settings', href: '/settings', icon: Settings },
-    ]
-  },
-  {
-    group: 'Version 2',
-    items: [
-      { name: 'V2 Settings', href: '/v2/settings', icon: Settings },
+      { name: 'Settings', href: '/v2/settings', icon: Settings },
       { name: 'AI Execution', href: '/v2/ai-execution', icon: Zap },
-      { name: 'V2 Requests', href: '/v2/requests', icon: FileText },
+      { name: 'Requests', href: '/v2/requests', icon: FileText },
+    ]
+  },
+  {
+    group: 'Workflow',
+    items: [
       { name: 'Thoughts', href: '/v2/thoughts', icon: Brain },
       { name: 'Plans', href: '/v2/plans', icon: ListChecks },
       { name: 'Tasks', href: '/v2/tasks', icon: CheckSquare },
       { name: 'Execution Timeline', href: '/v2/execution-timeline', icon: GitBranch },
+    ]
+  },
+  {
+    group: 'Tools & Resources',
+    items: [
       { name: 'Tools', href: '/v2/tools', icon: Wrench },
       { name: 'Prompts', href: '/v2/prompts', icon: MessageSquare },
       { name: 'Resources', href: '/v2/resources', icon: FolderOpen },

@@ -4,7 +4,7 @@ import * as React from 'react'
 import { useRouter } from 'next/navigation'
 import { useTheme } from 'next-themes'
 import { Command } from 'cmdk'
-import { Home, MessageSquare, Settings, Moon, Sun, Search, Sparkles, Brain, ListChecks, GitBranch, List, Database, GraduationCap } from 'lucide-react'
+import { MessageSquare, Settings, Moon, Sun, Search, Brain, ListChecks, GitBranch, List } from 'lucide-react'
 
 export function CommandPalette() {
   const [open, setOpen] = React.useState(false)
@@ -62,118 +62,57 @@ export function CommandPalette() {
                 Navigate
               </div>
               <Command.Item
-                onSelect={() => runCommand(() => router.push('/'))}
-                className="flex cursor-pointer items-center justify-between gap-2 rounded-md px-2 py-1.5 text-[13px] hover:bg-accent/10 aria-selected:bg-accent/10"
-              >
-                <div className="flex items-center gap-2">
-                  <Home className="h-3.5 w-3.5" />
-                  <span>Dashboard</span>
-                </div>
-              </Command.Item>
-              <Command.Item
-                onSelect={() => runCommand(() => router.push('/chat'))}
-                className="flex cursor-pointer items-center justify-between gap-2 rounded-md px-2 py-1.5 text-[13px] hover:bg-accent/10 aria-selected:bg-accent/10"
-              >
-                <div className="flex items-center gap-2">
-                  <MessageSquare className="h-3.5 w-3.5" />
-                  <span>Chat</span>
-                </div>
-              </Command.Item>
-              <Command.Item
-                onSelect={() => runCommand(() => router.push('/requests'))}
-                className="flex cursor-pointer items-center justify-between gap-2 rounded-md px-2 py-1.5 text-[13px] hover:bg-accent/10 aria-selected:bg-accent/10"
-              >
-                <div className="flex items-center gap-2">
-                  <List className="h-3.5 w-3.5" />
-                  <span>Requests</span>
-                </div>
-              </Command.Item>
-              <Command.Item
-                onSelect={() => runCommand(() => router.push('/settings'))}
+                onSelect={() => runCommand(() => router.push('/v2/settings'))}
                 className="flex cursor-pointer items-center justify-between gap-2 rounded-md px-2 py-1.5 text-[13px] hover:bg-accent/10 aria-selected:bg-accent/10"
               >
                 <div className="flex items-center gap-2">
                   <Settings className="h-3.5 w-3.5" />
-                  <span>Settings</span>
+                  <span>V2 Settings</span>
                 </div>
               </Command.Item>
-            </Command.Group>
-
-            <Command.Separator className="my-1 h-px bg-border/40 dark:bg-border/20" />
-
-            <Command.Group className="mb-1">
-              <div className="px-2 py-1.5 text-[10px] uppercase font-semibold text-muted-foreground/70 tracking-wider">
-                Agent Pipeline
-              </div>
               <Command.Item
-                onSelect={() => runCommand(() => router.push('/agents/pipeline'))}
+                onSelect={() => runCommand(() => router.push('/v2/ai-execution'))}
                 className="flex cursor-pointer items-center justify-between gap-2 rounded-md px-2 py-1.5 text-[13px] hover:bg-accent/10 aria-selected:bg-accent/10"
               >
                 <div className="flex items-center gap-2">
-                  <GitBranch className="h-3.5 w-3.5" />
-                  <span>Pipeline Overview</span>
+                  <MessageSquare className="h-3.5 w-3.5" />
+                  <span>AI Execution</span>
                 </div>
               </Command.Item>
               <Command.Item
-                onSelect={() => runCommand(() => router.push('/agents/complexity-detector'))}
+                onSelect={() => runCommand(() => router.push('/v2/requests'))}
                 className="flex cursor-pointer items-center justify-between gap-2 rounded-md px-2 py-1.5 text-[13px] hover:bg-accent/10 aria-selected:bg-accent/10"
               >
                 <div className="flex items-center gap-2">
-                  <Sparkles className="h-3.5 w-3.5" />
-                  <span>Complexity Detector</span>
+                  <List className="h-3.5 w-3.5" />
+                  <span>V2 Requests</span>
                 </div>
               </Command.Item>
               <Command.Item
-                onSelect={() => runCommand(() => router.push('/agents/thought-agent'))}
+                onSelect={() => runCommand(() => router.push('/v2/thoughts'))}
                 className="flex cursor-pointer items-center justify-between gap-2 rounded-md px-2 py-1.5 text-[13px] hover:bg-accent/10 aria-selected:bg-accent/10"
               >
                 <div className="flex items-center gap-2">
                   <Brain className="h-3.5 w-3.5" />
-                  <span>Thought Agent</span>
+                  <span>Thoughts</span>
                 </div>
               </Command.Item>
               <Command.Item
-                onSelect={() => runCommand(() => router.push('/agents/planner-agent'))}
+                onSelect={() => runCommand(() => router.push('/v2/plans'))}
                 className="flex cursor-pointer items-center justify-between gap-2 rounded-md px-2 py-1.5 text-[13px] hover:bg-accent/10 aria-selected:bg-accent/10"
               >
                 <div className="flex items-center gap-2">
                   <ListChecks className="h-3.5 w-3.5" />
-                  <span>Planner Agent</span>
-                </div>
-              </Command.Item>
-            </Command.Group>
-
-            <Command.Separator className="my-1 h-px bg-border/40 dark:bg-border/20" />
-
-            <Command.Group className="mb-1">
-              <div className="px-2 py-1.5 text-[10px] uppercase font-semibold text-muted-foreground/70 tracking-wider">
-                Training Data
-              </div>
-              <Command.Item
-                onSelect={() => runCommand(() => router.push('/agents/complexity-examples'))}
-                className="flex cursor-pointer items-center justify-between gap-2 rounded-md px-2 py-1.5 text-[13px] hover:bg-accent/10 aria-selected:bg-accent/10"
-              >
-                <div className="flex items-center gap-2">
-                  <Database className="h-3.5 w-3.5" />
-                  <span>Complexity Examples</span>
+                  <span>Plans</span>
                 </div>
               </Command.Item>
               <Command.Item
-                onSelect={() => runCommand(() => router.push('/agents/thought-examples'))}
+                onSelect={() => runCommand(() => router.push('/v2/tasks'))}
                 className="flex cursor-pointer items-center justify-between gap-2 rounded-md px-2 py-1.5 text-[13px] hover:bg-accent/10 aria-selected:bg-accent/10"
               >
                 <div className="flex items-center gap-2">
-                  <GraduationCap className="h-3.5 w-3.5" />
-                  <span>Thought Examples</span>
-                </div>
-              </Command.Item>
-              <Command.Item
-                onSelect={() => runCommand(() => router.push('/agents/planner-examples'))}
-                className="flex cursor-pointer items-center justify-between gap-2 rounded-md px-2 py-1.5 text-[13px] hover:bg-accent/10 aria-selected:bg-accent/10"
-              >
-                <div className="flex items-center gap-2">
-                  <ListChecks className="h-3.5 w-3.5" />
-                  <span>Planner Examples</span>
+                  <GitBranch className="h-3.5 w-3.5" />
+                  <span>Tasks</span>
                 </div>
               </Command.Item>
             </Command.Group>
