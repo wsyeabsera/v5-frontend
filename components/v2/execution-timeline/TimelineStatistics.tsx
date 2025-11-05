@@ -17,8 +17,25 @@ interface TimelineStatisticsProps {
 
 export function TimelineStatistics({ filters }: TimelineStatisticsProps) {
   const { data: thoughtsData } = useThoughts({ limit: 1000 })
-  const { data: plansData } = usePlans({ limit: 1000, ...filters })
-  const { data: tasksData } = useTasks({ limit: 1000, ...filters })
+  const { data: plansData } = usePlans({ 
+    limit: 1000, 
+    ...(filters?.status && typeof filters.status === 'string' 
+      ? { status: filters.status as 'pending' | 'in-progress' | 'completed' | 'failed' }
+      : {}),
+    ...(filters?.agentConfigId ? { agentConfigId: filters.agentConfigId } : {}),
+    ...(filters?.startDate ? { startDate: filters.startDate } : {}),
+    ...(filters?.endDate ? { endDate: filters.endDate } : {}),
+  })
+  const { data: tasksData } = useTasks({ 
+    limit: 1000, 
+    skip: 0,
+    ...(filters?.status && typeof filters.status === 'string' 
+      ? { status: filters.status as 'pending' | 'in_progress' | 'paused' | 'completed' | 'failed' | 'cancelled' }
+      : {}),
+    ...(filters?.agentConfigId ? { agentConfigId: filters.agentConfigId } : {}),
+    ...(filters?.startDate ? { startDate: filters.startDate } : {}),
+    ...(filters?.endDate ? { endDate: filters.endDate } : {}),
+  })
 
   const thoughts = useMemo(() => {
     if (Array.isArray(thoughtsData)) return thoughtsData

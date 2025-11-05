@@ -16,7 +16,7 @@ class MCPClientV2 {
     return `req_${Date.now()}_${++this.requestId}`
   }
 
-  private async request(method: string, params: any = {}) {
+  async request(method: string, params: any = {}, options?: { preserveNewlines?: boolean }) {
     const id = this.generateId()
 
     const response = await fetch(this.url, {
@@ -32,6 +32,8 @@ class MCPClientV2 {
           name: method,
           arguments: params,
         },
+        // Pass options through to the API route
+        options: options || {},
       }),
     })
 
@@ -232,7 +234,8 @@ class MCPClientV2 {
     if (options?.format) params.format = options.format
     if (options?.includeInsights !== undefined) params.includeInsights = options.includeInsights
     if (options?.includeRecommendations !== undefined) params.includeRecommendations = options.includeRecommendations
-    return this.request('summarize_task', params)
+    // Preserve newlines for markdown summaries
+    return this.request('summarize_task', params, { preserveNewlines: true })
   }
 }
 

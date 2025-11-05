@@ -53,10 +53,31 @@ export function ExecutionTimelineView() {
     searchType === 'all' ? { limit: 100 } : undefined
   )
   const { data: plansData, isLoading: isLoadingPlans } = usePlans(
-    searchType === 'all' ? { limit: 100, ...filters } : undefined
+    searchType === 'all' 
+      ? { 
+          limit: 100, 
+          ...(filters?.status && typeof filters.status === 'string' 
+            ? { status: filters.status as 'pending' | 'in-progress' | 'completed' | 'failed' }
+            : {}),
+          ...(filters?.agentConfigId ? { agentConfigId: filters.agentConfigId } : {}),
+          ...(filters?.startDate ? { startDate: filters.startDate } : {}),
+          ...(filters?.endDate ? { endDate: filters.endDate } : {}),
+        }
+      : undefined
   )
   const { data: tasksData, isLoading: isLoadingTasks } = useTasks(
-    searchType === 'all' ? { limit: 100, ...filters } : undefined
+    searchType === 'all' 
+      ? { 
+          limit: 100, 
+          skip: 0,
+          ...(filters?.status && typeof filters.status === 'string' 
+            ? { status: filters.status as 'pending' | 'in_progress' | 'paused' | 'completed' | 'failed' | 'cancelled' }
+            : {}),
+          ...(filters?.agentConfigId ? { agentConfigId: filters.agentConfigId } : {}),
+          ...(filters?.startDate ? { startDate: filters.startDate } : {}),
+          ...(filters?.endDate ? { endDate: filters.endDate } : {}),
+        }
+      : undefined
   )
 
   // Extract arrays from responses

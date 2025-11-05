@@ -1,6 +1,6 @@
 'use client'
 
-import { Settings, ChevronLeft, ChevronRight, MessageSquare, FileText, Brain, ListChecks, CheckSquare, GitBranch, Wrench, FolderOpen, Search, ListTodo, Zap, ChevronDown, FileText as FileTextIcon } from 'lucide-react'
+import { Settings, ChevronLeft, ChevronRight, MessageSquare, FileText, Brain, ListChecks, CheckSquare, GitBranch, Wrench, FolderOpen, Search, ListTodo, Zap, ChevronDown, FileText as FileTextIcon, Database, History, BarChart3, Sparkles, Network } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useState, useEffect } from 'react'
@@ -38,6 +38,16 @@ const navigation = [
       { name: 'Search Tools', href: '/v2/search-tools', icon: Search },
       { name: 'Search Prompts', href: '/v2/search-prompts', icon: Search },
       { name: 'Extract Prompt', href: '/v2/extract-prompt', icon: FileText },
+    ]
+  },
+  {
+    group: 'Intelligence',
+    items: [
+      { name: 'Memory System', href: '/v2/memory', icon: Database },
+      { name: 'History Query', href: '/v2/history-query', icon: History },
+      { name: 'Benchmarks', href: '/v2/benchmarks', icon: BarChart3 },
+      { name: 'Smart Features', href: '/v2/smart-features', icon: Sparkles },
+      { name: 'Pattern Recognition', href: '/v2/pattern-recognition', icon: Network },
     ]
   },
 ]

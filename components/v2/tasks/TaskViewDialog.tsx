@@ -207,7 +207,7 @@ export function TaskViewDialog({ open, onOpenChange, taskId }: TaskViewDialogPro
                     {pendingInputsCount} pending user input{pendingInputsCount !== 1 ? 's' : ''} required
                   </div>
                   <div className="space-y-2">
-                    {task.pendingUserInputs?.map((input, index) => (
+                    {task.pendingUserInputs?.map((input: any, index: number) => (
                       <div key={index} className="text-sm">
                         <span className="font-medium">Step {input.stepId}:</span> {input.field}
                         {input.description && (
@@ -429,7 +429,7 @@ export function TaskViewDialog({ open, onOpenChange, taskId }: TaskViewDialogPro
                         className="flex items-center justify-between p-2 border rounded bg-muted/30"
                       >
                         <span className="text-sm font-mono">{stepId}</span>
-                        <Badge variant="outline">{count} retr{count !== 1 ? 'ies' : 'y'}</Badge>
+                        <Badge variant="outline">{String(count)} retr{count !== 1 ? 'ies' : 'y'}</Badge>
                       </div>
                     ))}
                   </div>
