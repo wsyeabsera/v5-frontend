@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Brain, Calendar, ExternalLink, Copy, Check } from 'lucide-react'
 import { useState } from 'react'
 import Link from 'next/link'
+import { GeneratePlanButton } from '@/components/v2/thoughts/GeneratePlanButton'
 
 interface ThoughtNodeProps {
   thought: {
@@ -108,6 +109,12 @@ export function ThoughtNode({ thought, onView }: ThoughtNodeProps) {
             >
               View Details
             </Button>
+          )}
+          {thoughtId && (
+            <GeneratePlanButton
+              thoughtId={thoughtId}
+              agentConfigId={thought.agentConfigId}
+            />
           )}
           <Link href={`/v2/thoughts`} target="_blank">
             <Button variant="outline" size="sm" className="gap-2">

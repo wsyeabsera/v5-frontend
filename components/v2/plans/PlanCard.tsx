@@ -16,7 +16,8 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
 import { useDeletePlan } from '@/lib/queries-v2'
-import { Eye, Trash2, Loader2, Calendar, Target, Copy, Check } from 'lucide-react'
+import { ExecutePlanDialog } from './ExecutePlanDialog'
+import { Eye, Trash2, Loader2, Calendar, Target, Copy, Check, Play } from 'lucide-react'
 
 interface PlanCardProps {
   plan: {
@@ -37,6 +38,7 @@ export function PlanCard({ plan, onView }: PlanCardProps) {
   const deleteMutation = useDeletePlan()
   const planId = plan._id || plan.id || ''
   const [copied, setCopied] = useState(false)
+  const [executeDialogOpen, setExecuteDialogOpen] = useState(false)
 
   const handleDelete = async () => {
     if (!planId) return
@@ -133,17 +135,30 @@ export function PlanCard({ plan, onView }: PlanCardProps) {
         </div>
 
         {/* Actions */}
-        <div className="flex items-center gap-2 pt-2 border-t">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => planId && onView(planId)}
-            disabled={deleteMutation.isPending || !planId}
-            className="flex-1"
-          >
-            <Eye className="w-4 h-4 mr-2" />
-            View
-          </Button>
+        <div className="space-y-2 pt-2 border-t">
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => planId && onView(planId)}
+              disabled={deleteMutation.isPending || !planId}
+              className="flex-1"
+            >
+              <Eye className="w-4 h-4 mr-2" />
+              View
+            </Button>
+            {planId && (
+              <Button
+                variant="default"
+                size="sm"
+                onClick={() => setExecuteDialogOpen(true)}
+                disabled={deleteMutation.isPending}
+              >
+                <Play className="w-4 h-4 mr-2" />
+                Execute
+              </Button>
+            )}
+          </div>
           <Button
             variant="outline"
             size="sm"
@@ -190,6 +205,15 @@ export function PlanCard({ plan, onView }: PlanCardProps) {
               </AlertDialogFooter>
             </AlertDialogContent>
           </AlertDialog>
+
+          {/* Execute Plan Dialog */}
+          {planId && (
+            <ExecutePlanDialog
+              open={executeDialogOpen}
+              onOpenChange={setExecuteDialogOpen}
+              planId={planId}
+            />
+          )}
         </div>
       </div>
     </Card>

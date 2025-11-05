@@ -375,6 +375,56 @@ export function useDeleteTask() {
   })
 }
 
+export function useExecuteTask() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ planId, agentConfigId }: { planId: string; agentConfigId: string }) =>
+      mcpClientV2.executeTask(planId, agentConfigId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['v2', 'tasks'] })
+      queryClient.invalidateQueries({ queryKey: ['v2', 'plans'] })
+    },
+  })
+}
+
+export function useResumeTask() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({
+      taskId,
+      userInputs,
+    }: {
+      taskId: string
+      userInputs: Array<{ stepId: string; field: string; value: any }>
+    }) => mcpClientV2.resumeTask(taskId, userInputs),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['v2', 'tasks'] })
+      queryClient.invalidateQueries({ queryKey: ['v2', 'task', variables.taskId] })
+    },
+  })
+}
+
+export function useSummarizeTask() {
+  return useMutation({
+    mutationFn: ({
+      taskId,
+      format,
+      includeInsights,
+      includeRecommendations,
+    }: {
+      taskId: string
+      format?: 'brief' | 'detailed' | 'technical'
+      includeInsights?: boolean
+      includeRecommendations?: boolean
+    }) =>
+      mcpClientV2.summarizeTask(taskId, {
+        format,
+        includeInsights,
+        includeRecommendations,
+      }),
+  })
+}
+
 // Helper function to call MCP tools directly via /api/mcp-v2
 async function callMCPTool(toolName: string, arguments_: any = {}) {
   const response = await fetch('/api/mcp-v2', {

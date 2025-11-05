@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import {
   Dialog,
   DialogContent,
@@ -9,12 +9,17 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Badge } from '@/components/ui/badge'
+import { Card } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
 import { useTask } from '@/lib/queries-v2'
-import { Loader2, Calendar, CheckSquare, CheckCircle2, XCircle, Clock, AlertCircle, Copy, Check, Pause, Play } from 'lucide-react'
+import { TaskExecutionControls } from './TaskExecutionControls'
+import { TaskSummaryButton } from './TaskSummaryButton'
+import { hasSummary, getLatestSummary } from '@/lib/utils/summary-storage'
+import { Loader2, Calendar, CheckSquare, CheckCircle2, XCircle, Clock, AlertCircle, Copy, Check, Pause, Play, FileText } from 'lucide-react'
 import { JsonViewer } from '@/components/ui/json-viewer'
+import { useQueryClient } from '@tanstack/react-query'
 
 interface TaskViewDialogProps {
   open: boolean
@@ -23,8 +28,20 @@ interface TaskViewDialogProps {
 }
 
 export function TaskViewDialog({ open, onOpenChange, taskId }: TaskViewDialogProps) {
+  const queryClient = useQueryClient()
   const { data: task, isLoading, error } = useTask(taskId || '')
   const [copied, setCopied] = useState(false)
+
+  // Auto-refresh every 3 seconds if task is in progress
+  useEffect(() => {
+    if (!open || !taskId || task?.status !== 'in_progress') return
+
+    const interval = setInterval(() => {
+      queryClient.invalidateQueries({ queryKey: ['v2', 'task', taskId] })
+    }, 3000) // Poll every 3 seconds
+
+    return () => clearInterval(interval)
+  }, [open, taskId, task?.status, queryClient])
 
   const handleCopyTask = async () => {
     if (!task) return
@@ -136,8 +153,53 @@ export function TaskViewDialog({ open, onOpenChange, taskId }: TaskViewDialogPro
 
         {task && !isLoading && (
           <div className="space-y-6">
+            {/* Execution Controls */}
+            {(task.status === 'pending' || task.status === 'paused' || task.status === 'in_progress') && (
+              <div className="p-4 rounded-lg bg-muted/30 border">
+                <TaskExecutionControls 
+                  task={task} 
+                  onTaskUpdate={() => {
+                    // Refresh task data
+                    window.location.reload()
+                  }}
+                />
+              </div>
+            )}
+
+            {/* Summary Section for Completed/Failed Tasks */}
+            {(task.status === 'completed' || task.status === 'failed') && taskId && (
+              <Card className="p-4 bg-gradient-to-r from-primary/5 to-primary/10 border-primary/20">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 rounded-lg bg-primary/10">
+                      <FileText className="w-5 h-5 text-primary" />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold">Task Summary</h3>
+                      <p className="text-sm text-muted-foreground">
+                        {hasSummary(taskId)
+                          ? 'View or regenerate intelligent summaries of this task execution'
+                          : 'Generate an intelligent summary with insights and recommendations'}
+                      </p>
+                      {hasSummary(taskId) && (
+                        <div className="flex items-center gap-2 mt-2">
+                          <Badge variant="outline" className="text-xs">
+                            {getLatestSummary(taskId)?.format || 'detailed'} format available
+                          </Badge>
+                          <span className="text-xs text-muted-foreground">
+                            Last generated: {getLatestSummary(taskId)?.generatedAt ? new Date(getLatestSummary(taskId)!.generatedAt).toLocaleDateString() : ''}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <TaskSummaryButton taskId={taskId} variant="default" size="default" />
+                </div>
+              </Card>
+            )}
+
             {/* Pending Inputs Alert */}
-            {pendingInputsCount > 0 && (
+            {pendingInputsCount > 0 && task.status !== 'paused' && (
               <div className="flex items-start gap-3 p-4 rounded-lg bg-yellow-50 dark:bg-yellow-950/20 border border-yellow-200 dark:border-yellow-900/30">
                 <AlertCircle className="h-4 w-4 text-yellow-600 dark:text-yellow-400 flex-shrink-0 mt-0.5" />
                 <div className="flex-1 text-yellow-900 dark:text-yellow-100">

@@ -12,7 +12,8 @@ import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { Button } from '@/components/ui/button'
 import { usePlan } from '@/lib/queries-v2'
-import { Loader2, Calendar, Target, CheckCircle2, XCircle, Clock, AlertCircle, Copy, Check } from 'lucide-react'
+import { ExecutePlanDialog } from './ExecutePlanDialog'
+import { Loader2, Calendar, Target, CheckCircle2, XCircle, Clock, AlertCircle, Copy, Check, Play } from 'lucide-react'
 import { JsonViewer } from '@/components/ui/json-viewer'
 
 interface PlanViewDialogProps {
@@ -24,6 +25,7 @@ interface PlanViewDialogProps {
 export function PlanViewDialog({ open, onOpenChange, planId }: PlanViewDialogProps) {
   const { data: plan, isLoading, error } = usePlan(planId || '')
   const [copied, setCopied] = useState(false)
+  const [executeDialogOpen, setExecuteDialogOpen] = useState(false)
 
   const handleCopyPlan = async () => {
     if (!plan) return
@@ -161,6 +163,18 @@ export function PlanViewDialog({ open, onOpenChange, planId }: PlanViewDialogPro
                   </p>
                 </div>
               )}
+
+              {/* Execute Plan Button */}
+              <div className="pt-2">
+                <Button
+                  variant="default"
+                  size="sm"
+                  onClick={() => setExecuteDialogOpen(true)}
+                >
+                  <Play className="w-4 h-4 mr-2" />
+                  Execute Plan
+                </Button>
+              </div>
             </div>
 
             <Separator />
@@ -307,6 +321,19 @@ export function PlanViewDialog({ open, onOpenChange, planId }: PlanViewDialogPro
           </div>
         )}
       </DialogContent>
+
+      {/* Execute Plan Dialog */}
+      {planId && (
+        <ExecutePlanDialog
+          open={executeDialogOpen}
+          onOpenChange={setExecuteDialogOpen}
+          planId={planId}
+          onSuccess={() => {
+            // Refresh plan data
+            window.location.reload()
+          }}
+        />
+      )}
     </Dialog>
   )
 }

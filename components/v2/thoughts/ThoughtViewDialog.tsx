@@ -9,7 +9,9 @@ import {
 } from '@/components/ui/dialog'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
+import { Button } from '@/components/ui/button'
 import { useThought } from '@/lib/queries-v2'
+import { GeneratePlanButton } from './GeneratePlanButton'
 import { Loader2, Calendar } from 'lucide-react'
 import { JsonViewer } from '@/components/ui/json-viewer'
 
@@ -78,6 +80,14 @@ export function ThoughtViewDialog({ open, onOpenChange, thoughtId }: ThoughtView
                     <span>Created: {new Date(thought.createdAt).toLocaleString()}</span>
                   </div>
                 )}
+              </div>
+
+              {/* Generate Plan Button */}
+              <div className="pt-2">
+                <GeneratePlanButton
+                  thoughtId={thought._id || thought.id || ''}
+                  agentConfigId={thought.agentConfigId}
+                />
               </div>
             </div>
 

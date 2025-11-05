@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Target, Calendar, ExternalLink, Copy, Check, CheckCircle2, Clock, XCircle } from 'lucide-react'
 import { useState } from 'react'
 import Link from 'next/link'
+import { ExecutePlanButton } from './ExecutePlanButton'
 
 interface PlanNodeProps {
   plan: {
@@ -143,16 +144,19 @@ export function PlanNode({ plan, onView, onViewThought }: PlanNodeProps) {
         </div>
 
         {/* Actions */}
-        <div className="flex items-center gap-2 pt-2 border-t">
+        <div className="flex items-center gap-2 pt-2 border-t flex-wrap">
           {onView && (
             <Button
               variant="outline"
               size="sm"
               onClick={() => planId && onView(planId)}
-              className="flex-1"
+              className="flex-1 min-w-[120px]"
             >
               View Details
             </Button>
+          )}
+          {planId && plan.status !== 'completed' && (
+            <ExecutePlanButton planId={planId} />
           )}
           <Link href={`/v2/plans`} target="_blank">
             <Button variant="outline" size="sm" className="gap-2">

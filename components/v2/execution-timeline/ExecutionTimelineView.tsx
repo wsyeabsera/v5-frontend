@@ -1,19 +1,25 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useMemo } from 'react'
 import { useThoughts, usePlans, useTasks, useThought, usePlan, useTask } from '@/lib/queries-v2'
-import { ExecutionFlowCard } from './ExecutionFlowCard'
+import { TimelineStatistics } from './TimelineStatistics'
+import { GroupedTimelineView } from './GroupedTimelineView'
+import { FlowchartView } from './FlowchartView'
 import { TimelineSearch } from './TimelineSearch'
 import { TimelineFilters } from './TimelineFilters'
 import { ThoughtViewDialog } from '@/components/v2/thoughts/ThoughtViewDialog'
 import { PlanViewDialog } from '@/components/v2/plans/PlanViewDialog'
 import { TaskViewDialog } from '@/components/v2/tasks/TaskViewDialog'
 import { Button } from '@/components/ui/button'
-import { Loader2, AlertCircle, RefreshCw } from 'lucide-react'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Loader2, AlertCircle, RefreshCw, List, GitBranch } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
+
+type ViewMode = 'grouped' | 'flowchart'
 
 export function ExecutionTimelineView() {
   const queryClient = useQueryClient()
+  const [viewMode, setViewMode] = useState<ViewMode>('grouped')
   const [searchType, setSearchType] = useState<'thoughtId' | 'planId' | 'taskId' | 'all' | null>('all')
   const [searchValue, setSearchValue] = useState('')
   const [filters, setFilters] = useState<{
@@ -44,13 +50,13 @@ export function ExecutionTimelineView() {
 
   // Fetch lists for "all" view
   const { data: thoughtsData, isLoading: isLoadingThoughts } = useThoughts(
-    searchType === 'all' ? { limit: 50 } : undefined
+    searchType === 'all' ? { limit: 100 } : undefined
   )
   const { data: plansData, isLoading: isLoadingPlans } = usePlans(
-    searchType === 'all' ? { limit: 50 } : undefined
+    searchType === 'all' ? { limit: 100, ...filters } : undefined
   )
   const { data: tasksData, isLoading: isLoadingTasks } = useTasks(
-    searchType === 'all' ? { limit: 50 } : undefined
+    searchType === 'all' ? { limit: 100, ...filters } : undefined
   )
 
   // Extract arrays from responses
@@ -77,108 +83,6 @@ export function ExecutionTimelineView() {
     if (Array.isArray(tasksData)) return tasksData
     return tasksData?.tasks || []
   }, [taskData, tasksData, searchType])
-
-  // Build execution flows from fetched data
-  const executionFlows = useMemo(() => {
-    if (searchType === 'thoughtId' && thoughtData) {
-      // Find related plans and tasks
-      const relatedPlans = plans.filter((p: any) => p.thoughtId === thoughtData._id || p.thoughtId === thoughtData.id)
-      const relatedTasks = tasks.filter((t: any) =>
-        relatedPlans.some((p: any) => t.planId === (p._id || p.id))
-      )
-      return [{
-        thought: thoughtData,
-        plan: relatedPlans[0] || null,
-        tasks: relatedTasks,
-      }]
-    }
-
-    if (searchType === 'planId' && planData) {
-      // Find related thought and tasks
-      const relatedThought = thoughts.find((t: any) => t._id === planData.thoughtId || t.id === planData.thoughtId)
-      const relatedTasks = tasks.filter((t: any) => t.planId === (planData._id || planData.id))
-      return [{
-        thought: relatedThought || null,
-        plan: planData,
-        tasks: relatedTasks,
-      }]
-    }
-
-    if (searchType === 'taskId' && taskData) {
-      // Find related plan and thought
-      const relatedPlan = plans.find((p: any) => p._id === taskData.planId || p.id === taskData.planId)
-      const relatedThought = relatedPlan
-        ? thoughts.find((t: any) => t._id === relatedPlan.thoughtId || t.id === relatedPlan.thoughtId)
-        : null
-      return [{
-        thought: relatedThought || null,
-        plan: relatedPlan || null,
-        tasks: [taskData],
-      }]
-    }
-
-    // For "all" view, build flows from all data
-    const flows: Array<{ thought?: any; plan?: any; tasks: any[] }> = []
-    const processedPlans = new Set<string>()
-    const processedTasks = new Set<string>()
-
-    // Group by thought
-    thoughts.forEach((thought: any) => {
-      const thoughtId = thought._id || thought.id
-      const relatedPlans = plans.filter((p: any) => p.thoughtId === thoughtId)
-      const flowTasks: any[] = []
-
-      relatedPlans.forEach((plan: any) => {
-        const planId = plan._id || plan.id
-        if (!processedPlans.has(planId)) {
-          processedPlans.add(planId)
-          const planTasks = tasks.filter((t: any) => t.planId === planId)
-          planTasks.forEach((task: any) => {
-            const taskId = task._id || task.id
-            if (!processedTasks.has(taskId)) {
-              processedTasks.add(taskId)
-              flowTasks.push(task)
-            }
-          })
-        }
-      })
-
-      if (relatedPlans.length > 0) {
-        flows.push({
-          thought,
-          plan: relatedPlans[0],
-          tasks: flowTasks,
-        })
-      } else {
-        flows.push({ thought, tasks: [] })
-      }
-    })
-
-    // Add plans without thoughts
-    plans.forEach((plan: any) => {
-      const planId = plan._id || plan.id
-      if (!processedPlans.has(planId)) {
-        processedPlans.add(planId)
-        const planTasks = tasks.filter((t: any) => t.planId === planId)
-        flows.push({
-          plan,
-          tasks: planTasks,
-        })
-      }
-    })
-
-    // Add tasks without plans
-    tasks.forEach((task: any) => {
-      const taskId = task._id || task.id
-      if (!processedTasks.has(taskId)) {
-        flows.push({
-          tasks: [task],
-        })
-      }
-    })
-
-    return flows
-  }, [thoughtData, planData, taskData, thoughts, plans, tasks, searchType])
 
   const isLoading =
     isLoadingThought ||
@@ -209,8 +113,15 @@ export function ExecutionTimelineView() {
     setViewTaskDialogOpen(true)
   }
 
+  const hasData = thoughts.length > 0 || plans.length > 0 || tasks.length > 0
+
   return (
     <div className="space-y-6">
+      {/* Statistics Overview */}
+      {searchType === 'all' && !isLoading && (
+        <TimelineStatistics filters={filters} />
+      )}
+
       {/* Search and Filters */}
       <div className="space-y-4">
         <TimelineSearch
@@ -228,8 +139,20 @@ export function ExecutionTimelineView() {
         )}
       </div>
 
-      {/* Refresh Button */}
-      <div className="flex justify-end">
+      {/* Controls */}
+      <div className="flex items-center justify-between">
+        <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as ViewMode)}>
+          <TabsList>
+            <TabsTrigger value="grouped">
+              <List className="w-4 h-4 mr-2" />
+              Grouped List
+            </TabsTrigger>
+            <TabsTrigger value="flowchart">
+              <GitBranch className="w-4 h-4 mr-2" />
+              Flowchart
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
         <Button variant="outline" size="sm" onClick={handleRefresh} disabled={isLoading}>
           <RefreshCw className={`w-4 h-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
           Refresh
@@ -244,8 +167,8 @@ export function ExecutionTimelineView() {
         </div>
       )}
 
-      {/* Execution Flows */}
-      {!isLoading && executionFlows.length === 0 && (
+      {/* Empty State */}
+      {!isLoading && !hasData && (
         <div className="flex flex-col items-center justify-center p-12 border rounded-lg bg-muted/30">
           <AlertCircle className="w-12 h-12 text-muted-foreground mb-4" />
           <h3 className="text-lg font-semibold mb-2">No execution flows found</h3>
@@ -257,20 +180,30 @@ export function ExecutionTimelineView() {
         </div>
       )}
 
-      {!isLoading && executionFlows.length > 0 && (
-        <div className="space-y-6">
-          {executionFlows.map((flow, index) => (
-            <ExecutionFlowCard
-              key={`flow-${index}-${flow.thought?._id || flow.thought?.id || flow.plan?._id || flow.plan?.id || index}`}
-              thought={flow.thought}
-              plan={flow.plan}
-              tasks={flow.tasks}
+      {/* Content Views */}
+      {!isLoading && hasData && (
+        <>
+          {viewMode === 'grouped' && (
+            <GroupedTimelineView
+              thoughts={thoughts}
+              plans={plans}
+              tasks={tasks}
               onViewThought={handleViewThought}
               onViewPlan={handleViewPlan}
               onViewTask={handleViewTask}
             />
-          ))}
-        </div>
+          )}
+          {viewMode === 'flowchart' && (
+            <FlowchartView
+              thoughts={thoughts}
+              plans={plans}
+              tasks={tasks}
+              onViewThought={handleViewThought}
+              onViewPlan={handleViewPlan}
+              onViewTask={handleViewTask}
+            />
+          )}
+        </>
       )}
 
       {/* View Dialogs */}

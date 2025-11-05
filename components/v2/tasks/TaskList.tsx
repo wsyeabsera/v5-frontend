@@ -1,14 +1,17 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useTasks } from '@/lib/queries-v2'
 import { TaskCard } from './TaskCard'
 import { TaskViewDialog } from './TaskViewDialog'
 import { TaskFilters } from './TaskFilters'
 import { Button } from '@/components/ui/button'
 import { Loader2, AlertCircle } from 'lucide-react'
+import { useQueryClient } from '@tanstack/react-query'
+import { useEffect } from 'react'
 
 export function TaskList() {
+  const queryClient = useQueryClient()
   const [filters, setFilters] = useState<{
     planId?: string
     status?: 'pending' | 'in_progress' | 'paused' | 'completed' | 'failed' | 'cancelled'
@@ -29,6 +32,23 @@ export function TaskList() {
   const tasks = Array.isArray(tasksData) 
     ? tasksData 
     : tasksData?.tasks || []
+
+  // Check if there are any in-progress tasks
+  const hasInProgressTasks = useMemo(() => {
+    return tasks.some((task: any) => task.status === 'in_progress')
+  }, [tasks])
+
+  // Auto-refresh every 3 seconds if there are in-progress tasks
+  useEffect(() => {
+    if (!hasInProgressTasks) return
+
+    const interval = setInterval(() => {
+      queryClient.invalidateQueries({ queryKey: ['v2', 'tasks'] })
+    }, 3000) // Poll every 3 seconds
+
+    return () => clearInterval(interval)
+  }, [hasInProgressTasks, queryClient])
+
   const pagination = tasksData && typeof tasksData === 'object' && !Array.isArray(tasksData)
     ? {
         total: tasksData.total || tasks.length,

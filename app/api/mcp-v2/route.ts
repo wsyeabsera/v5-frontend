@@ -7,11 +7,11 @@ let requestId = 0
 /**
  * Cleans and parses MCP result by:
  * 1. Extracting text content from content array
- * 2. Removing newlines (both literal and escaped \n patterns)
+ * 2. Removing newlines (both literal and escaped \n patterns) - EXCEPT for markdown/text content
  * 3. Removing trailing \n4 patterns
  * 4. Parsing as JSON if valid
  */
-function cleanAndParseMCPResult(result: any): any {
+function cleanAndParseMCPResult(result: any, preserveNewlines: boolean = false): any {
   // If result has content array with text, extract and clean it
   if (result?.content && Array.isArray(result.content)) {
     const textContent = result.content
@@ -20,18 +20,30 @@ function cleanAndParseMCPResult(result: any): any {
       .trim()
 
     if (textContent) {
-      // Remove all newlines: literal newlines, escaped newlines (\n), and whitespace
-      // First handle escaped newlines (backslash followed by n)
-      let cleaned = textContent.replace(/\\n/g, '')
-      // Then remove literal newlines
-      cleaned = cleaned.replace(/\n/g, '')
-      // Remove any trailing whitespace
-      cleaned = cleaned.trim()
+      let cleaned = textContent
       
-      // Remove trailing patterns like \n4 (both escaped and literal)
-      cleaned = cleaned.replace(/\\n\d+$/g, '')
-      cleaned = cleaned.replace(/\n\d+$/g, '')
-      cleaned = cleaned.trim()
+      if (!preserveNewlines) {
+        // Remove all newlines: literal newlines, escaped newlines (\n), and whitespace
+        // First handle escaped newlines (backslash followed by n)
+        cleaned = cleaned.replace(/\\n/g, '')
+        // Then remove literal newlines
+        cleaned = cleaned.replace(/\n/g, '')
+        // Remove any trailing whitespace
+        cleaned = cleaned.trim()
+        
+        // Remove trailing patterns like \n4 (both escaped and literal)
+        cleaned = cleaned.replace(/\\n\d+$/g, '')
+        cleaned = cleaned.replace(/\n\d+$/g, '')
+        cleaned = cleaned.trim()
+      } else {
+        // For markdown/text content, preserve newlines but clean up problematic patterns
+        // Remove trailing patterns like \n4 (both escaped and literal)
+        cleaned = cleaned.replace(/\\n\d+$/g, '')
+        cleaned = cleaned.replace(/\n\d+$/g, '')
+        // Normalize escaped newlines to actual newlines
+        cleaned = cleaned.replace(/\\n/g, '\n')
+        cleaned = cleaned.trim()
+      }
       
       // Try to parse as JSON
       try {
@@ -50,8 +62,16 @@ function cleanAndParseMCPResult(result: any): any {
 
   // If result is a string, try to clean and parse it
   if (typeof result === 'string') {
-    let cleaned = result.replace(/\\n/g, '').replace(/\n/g, '').trim()
-    cleaned = cleaned.replace(/\\n\d+$/g, '').replace(/\n\d+$/g, '').trim()
+    let cleaned = result
+    if (!preserveNewlines) {
+      cleaned = cleaned.replace(/\\n/g, '').replace(/\n/g, '').trim()
+      cleaned = cleaned.replace(/\\n\d+$/g, '').replace(/\n\d+$/g, '').trim()
+    } else {
+      cleaned = cleaned.replace(/\\n\d+$/g, '')
+      cleaned = cleaned.replace(/\n\d+$/g, '')
+      cleaned = cleaned.replace(/\\n/g, '\n')
+      cleaned = cleaned.trim()
+    }
     
     try {
       const parsed = JSON.parse(cleaned)
@@ -139,8 +159,9 @@ export async function POST(request: NextRequest) {
         throw new Error(data.error.message || 'MCP request failed')
       }
 
-      // Clean and parse the result
-      const cleanedResult = cleanAndParseMCPResult(data.result)
+      // For summarize_task, preserve newlines since it returns markdown
+      const preserveNewlines = params.name === 'summarize_task'
+      const cleanedResult = cleanAndParseMCPResult(data.result, preserveNewlines)
 
       return NextResponse.json({ result: cleanedResult })
     }

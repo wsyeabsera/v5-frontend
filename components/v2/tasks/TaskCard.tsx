@@ -17,7 +17,10 @@ import {
 } from '@/components/ui/alert-dialog'
 import { Progress } from '@/components/ui/progress'
 import { useDeleteTask } from '@/lib/queries-v2'
-import { Eye, Trash2, Loader2, Calendar, CheckSquare, AlertCircle, Copy, Check } from 'lucide-react'
+import { TaskExecutionControls } from './TaskExecutionControls'
+import { TaskSummaryButton } from './TaskSummaryButton'
+import { hasSummary } from '@/lib/utils/summary-storage'
+import { Eye, Trash2, Loader2, Calendar, CheckSquare, AlertCircle, Copy, Check, FileText } from 'lucide-react'
 
 interface TaskCardProps {
   task: {
@@ -166,6 +169,14 @@ export function TaskCard({ task, onView }: TaskCardProps) {
             </Badge>
           )}
 
+          {/* Summary Indicator */}
+          {(task.status === 'completed' || task.status === 'failed') && taskId && hasSummary(taskId) && (
+            <Badge variant="outline" className="gap-1 bg-primary/10 border-primary/30">
+              <FileText className="w-3 h-3 text-primary" />
+              Summary Available
+            </Badge>
+          )}
+
           {/* Completed Steps */}
           {completedStepsCount > 0 && (
             <Badge variant="secondary">
@@ -197,6 +208,13 @@ export function TaskCard({ task, onView }: TaskCardProps) {
           )}
         </div>
 
+        {/* Execution Controls */}
+        {(task.status === 'pending' || task.status === 'paused' || task.status === 'in_progress') && (
+          <div className="pt-2 border-t">
+            <TaskExecutionControls task={task} />
+          </div>
+        )}
+
         {/* Actions */}
         <div className="flex items-center gap-2 pt-2 border-t">
           <Button
@@ -209,6 +227,9 @@ export function TaskCard({ task, onView }: TaskCardProps) {
             <Eye className="w-4 h-4 mr-2" />
             View
           </Button>
+          {(task.status === 'completed' || task.status === 'failed') && taskId && (
+            <TaskSummaryButton taskId={taskId} />
+          )}
           <Button
             variant="outline"
             size="sm"

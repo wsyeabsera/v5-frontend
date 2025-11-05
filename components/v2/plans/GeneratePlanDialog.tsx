@@ -21,12 +21,16 @@ interface GeneratePlanDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   onSuccess?: () => void
+  initialThoughtId?: string
+  initialAgentConfigId?: string
 }
 
 export function GeneratePlanDialog({
   open,
   onOpenChange,
   onSuccess,
+  initialThoughtId,
+  initialAgentConfigId,
 }: GeneratePlanDialogProps) {
   const [thoughtId, setThoughtId] = useState('')
   const [thoughtJson, setThoughtJson] = useState('')
@@ -40,14 +44,14 @@ export function GeneratePlanDialog({
 
   useEffect(() => {
     if (open) {
-      setThoughtId('')
+      setThoughtId(initialThoughtId || '')
       setThoughtJson('')
       setUseThoughtObject(false)
-      setAgentConfigId('')
+      setAgentConfigId(initialAgentConfigId || '')
       setEnableToolSearch(true)
       setErrors({})
     }
-  }, [open])
+  }, [open, initialThoughtId, initialAgentConfigId])
 
   const validate = (): boolean => {
     const newErrors: Record<string, string> = {}

@@ -209,6 +209,31 @@ class MCPClientV2 {
   async readMCPResource(uri: string) {
     return this.request('read_mcp_resource', { uri })
   }
+
+  // Task execution methods
+  async executeTask(planId: string, agentConfigId: string) {
+    return this.request('execute_task', { planId, agentConfigId })
+  }
+
+  async resumeTask(taskId: string, userInputs: Array<{ stepId: string; field: string; value: any }>) {
+    return this.request('resume_task', { taskId, userInputs })
+  }
+
+  // Task summary methods
+  async summarizeTask(
+    taskId: string,
+    options?: {
+      format?: 'brief' | 'detailed' | 'technical'
+      includeInsights?: boolean
+      includeRecommendations?: boolean
+    }
+  ) {
+    const params: any = { taskId }
+    if (options?.format) params.format = options.format
+    if (options?.includeInsights !== undefined) params.includeInsights = options.includeInsights
+    if (options?.includeRecommendations !== undefined) params.includeRecommendations = options.includeRecommendations
+    return this.request('summarize_task', params)
+  }
 }
 
 // Singleton instance

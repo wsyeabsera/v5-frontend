@@ -7,6 +7,7 @@ import { Progress } from '@/components/ui/progress'
 import { CheckSquare, Calendar, ExternalLink, Copy, Check, CheckCircle2, Clock, XCircle, Pause, AlertCircle } from 'lucide-react'
 import { useState } from 'react'
 import Link from 'next/link'
+import { TaskExecutionControls } from '@/components/v2/tasks/TaskExecutionControls'
 
 interface TaskNodeProps {
   task: {
@@ -197,6 +198,11 @@ export function TaskNode({ task, onView, onViewPlan }: TaskNodeProps) {
               <span>{new Date(task.createdAt).toLocaleString()}</span>
             </div>
           )}
+        </div>
+
+        {/* Quick Actions */}
+        <div className="pt-2 border-t">
+          <TaskExecutionControls task={task} />
         </div>
 
         {/* Actions */}

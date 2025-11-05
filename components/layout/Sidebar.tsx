@@ -1,6 +1,6 @@
 'use client'
 
-import { Settings, ChevronLeft, ChevronRight, MessageSquare, FileText, Brain, ListChecks, CheckSquare, GitBranch, Wrench, FolderOpen, Search, ListTodo, Zap, ChevronDown } from 'lucide-react'
+import { Settings, ChevronLeft, ChevronRight, MessageSquare, FileText, Brain, ListChecks, CheckSquare, GitBranch, Wrench, FolderOpen, Search, ListTodo, Zap, ChevronDown, FileText as FileTextIcon } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useState, useEffect } from 'react'
@@ -23,6 +23,7 @@ const navigation = [
       { name: 'Thoughts', href: '/v2/thoughts', icon: Brain },
       { name: 'Plans', href: '/v2/plans', icon: ListChecks },
       { name: 'Tasks', href: '/v2/tasks', icon: CheckSquare },
+      { name: 'Task Summaries', href: '/v2/task-summaries', icon: FileText },
       { name: 'Execution Timeline', href: '/v2/execution-timeline', icon: GitBranch },
     ]
   },

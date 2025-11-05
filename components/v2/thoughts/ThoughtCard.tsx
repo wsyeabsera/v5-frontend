@@ -15,6 +15,7 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
 import { useDeleteThought } from '@/lib/queries-v2'
+import { GeneratePlanButton } from './GeneratePlanButton'
 import { Eye, Trash2, Loader2, Calendar } from 'lucide-react'
 
 interface ThoughtCardProps {
@@ -88,17 +89,25 @@ export function ThoughtCard({ thought, onView }: ThoughtCardProps) {
         </div>
 
         {/* Actions */}
-        <div className="flex items-center gap-2 pt-2 border-t">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => thoughtId && onView(thoughtId)}
-            disabled={deleteMutation.isPending || !thoughtId}
-            className="flex-1"
-          >
-            <Eye className="w-4 h-4 mr-2" />
-            View
-          </Button>
+        <div className="space-y-2 pt-2 border-t">
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => thoughtId && onView(thoughtId)}
+              disabled={deleteMutation.isPending || !thoughtId}
+              className="flex-1"
+            >
+              <Eye className="w-4 h-4 mr-2" />
+              View
+            </Button>
+            {thoughtId && (
+              <GeneratePlanButton
+                thoughtId={thoughtId}
+                agentConfigId={thought.agentConfigId}
+              />
+            )}
+          </div>
           <AlertDialog>
             <AlertDialogTrigger asChild>
               <Button
