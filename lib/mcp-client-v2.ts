@@ -18,7 +18,7 @@ class MCPClientV2 {
 
   private async request(method: string, params: any = {}) {
     const id = this.generateId()
-    
+
     const response = await fetch(this.url, {
       method: 'POST',
       headers: {
@@ -46,22 +46,31 @@ class MCPClientV2 {
       throw new Error(data.error.message || 'MCP request failed')
     }
 
-    // Handle MCP response format
+    // The route now handles cleaning and parsing, so data.result should already be parsed
+    // But we still need to handle error cases
     if (data.result?.isError) {
       const errorText = data.result.content?.[0]?.text || 'Unknown error'
       throw new Error(errorText)
     }
 
-    // Parse JSON from text content if present
-    const textContent = data.result?.content?.[0]?.text
-    if (textContent) {
-      try {
-        return JSON.parse(textContent)
-      } catch {
-        return textContent
+    // Since the route now parses JSON responses, data.result should be the parsed data
+    // If it's still in the old format with content array, handle it (backward compatibility)
+    if (data.result?.content && Array.isArray(data.result.content)) {
+      const textContent = data.result.content
+        .map((item: any) => item?.text || '')
+        .join('')
+        .trim()
+
+      if (textContent) {
+        try {
+          return JSON.parse(textContent)
+        } catch {
+          return textContent
+        }
       }
     }
 
+    // Return the result directly (should already be parsed by the route)
     return data.result
   }
 
@@ -190,6 +199,15 @@ class MCPClientV2 {
 
   async deleteRequest(id: string) {
     return this.request('remove_request', { id })
+  }
+
+  // MCP Resource methods (remote server resources)
+  async listMCPResources() {
+    return this.request('list_mcp_resources', {})
+  }
+
+  async readMCPResource(uri: string) {
+    return this.request('read_mcp_resource', { uri })
   }
 }
 

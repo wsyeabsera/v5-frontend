@@ -540,10 +540,11 @@ function MetaAgentContent() {
                     </CardHeader>
                     <CardContent>
                       <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-line">
-                        {result.replanStrategy.split('.').map((sentence, idx) => {
+                        {result.replanStrategy?.split('.').map((sentence, idx) => {
                           if (!sentence.trim()) return null;
                           // Highlight step IDs, tool names, and placeholders
                           const parts = sentence.split(/(step-\d+|EXTRACT_FROM[^.,\s]+|get_facility|list_contaminants|generate_intelligent_facility_report|critique issue \d+)/gi);
+                          const strategyParts = result.replanStrategy?.split('.') || [];
                           return (
                             <span key={idx}>
                               {parts.map((part, pIdx) => {
@@ -556,7 +557,7 @@ function MetaAgentContent() {
                                   <span key={pIdx}>{part}</span>
                                 );
                               })}
-                              {idx < result.replanStrategy.split('.').length - 2 && '. '}
+                              {idx < strategyParts.length - 2 && '. '}
                             </span>
                           );
                         })}

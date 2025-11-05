@@ -1,6 +1,6 @@
 'use client'
 
-import { Home, MessageSquare, Settings, ChevronLeft, ChevronRight, List, Sparkles, Database, Cpu, Brain, GraduationCap, ListChecks, ShieldCheck, Play, ChevronDown, FileText, BarChart, Eye, RotateCcw, Zap } from 'lucide-react'
+import { Home, MessageSquare, Settings, ChevronLeft, ChevronRight, List, Sparkles, Database, Cpu, Brain, GraduationCap, ListChecks, ShieldCheck, Play, ChevronDown, FileText, BarChart, Eye, RotateCcw, Zap, Wrench, FolderOpen, Search, ListTodo, CheckSquare, GitBranch } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useState, useEffect } from 'react'
@@ -52,6 +52,18 @@ const navigation = [
       { name: 'V2 Settings', href: '/v2/settings', icon: Settings },
       { name: 'AI Execution', href: '/v2/ai-execution', icon: Zap },
       { name: 'V2 Requests', href: '/v2/requests', icon: FileText },
+      { name: 'Thoughts', href: '/v2/thoughts', icon: Brain },
+      { name: 'Plans', href: '/v2/plans', icon: ListChecks },
+      { name: 'Tasks', href: '/v2/tasks', icon: CheckSquare },
+      { name: 'Execution Timeline', href: '/v2/execution-timeline', icon: GitBranch },
+      { name: 'Tools', href: '/v2/tools', icon: Wrench },
+      { name: 'Prompts', href: '/v2/prompts', icon: MessageSquare },
+      { name: 'Resources', href: '/v2/resources', icon: FolderOpen },
+      { name: 'List MCP Resources', href: '/v2/list-mcp-resources', icon: ListTodo },
+      { name: 'Read MCP Resource', href: '/v2/read-mcp-resource', icon: FileText },
+      { name: 'Search Tools', href: '/v2/search-tools', icon: Search },
+      { name: 'Search Prompts', href: '/v2/search-prompts', icon: Search },
+      { name: 'Extract Prompt', href: '/v2/extract-prompt', icon: FileText },
     ]
   },
 ]

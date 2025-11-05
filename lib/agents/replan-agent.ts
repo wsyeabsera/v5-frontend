@@ -338,8 +338,7 @@ ${criticOutput.critique.suggestions.map((s, i) => `${i + 1}. ${s}`).join('\n') |
 ${criticOutput.validationWarnings && criticOutput.validationWarnings.length > 0
   ? criticOutput.validationWarnings.map((w, i) => `
 ${i + 1}. Step ${w.stepOrder} (${w.tool}): Missing parameter "${w.missingParam}"
-   - Can be resolved: ${w.canResolve ? 'YES' : 'NO'}
-   - Requires user input: ${w.requiresUserInput ? 'YES' : 'NO'}
+   - Required: ${w.isRequired ? 'YES' : 'NO'}
 `).join('\n')
   : 'None'}
 
