@@ -37,7 +37,7 @@ export function OrchestratorCard({
 }: OrchestratorCardProps) {
   const hasConfig = !!orchestrator.config?.agentConfigs
   const agentConfigsCount = hasConfig
-    ? Object.keys(orchestrator.config.agentConfigs || {}).length
+    ? Object.keys(orchestrator.config?.agentConfigs || {}).length
     : 0
 
   return (

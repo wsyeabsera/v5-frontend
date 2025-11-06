@@ -42,7 +42,7 @@ export function PerformanceDashboard({ metrics }: PerformanceDashboardProps) {
         const scores = [q.outputCompleteness, q.outputRelevance, q.outputAccuracy].filter((s: any) => typeof s === 'number')
         return scores.length > 0 ? scores.reduce((a: number, b: number) => a + b, 0) / scores.length : null
       })
-      .filter((q: any) => q !== null)
+      .filter((q: any): q is number => q !== null)
     
     const avgQuality = qualities.length > 0
       ? Math.round(qualities.reduce((a: number, b: number) => a + b, 0) / qualities.length)

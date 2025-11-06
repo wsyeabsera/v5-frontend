@@ -19,7 +19,7 @@ export function TokenUsageChart({ metrics, period = 'daily' }: TokenUsageChartPr
     const grouped = groupByPeriod(filtered, period)
     const aggregated: any[] = []
 
-    for (const [key, periodMetrics] of grouped.entries()) {
+    for (const [key, periodMetrics] of Array.from(grouped.entries())) {
       const tokens = aggregateTokens(periodMetrics)
       const firstMetric = periodMetrics[0]
       const date = new Date(firstMetric.timestamp)

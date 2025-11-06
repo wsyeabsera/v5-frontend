@@ -69,7 +69,7 @@ export function OrchestrationStreamView({
               phase="thought"
               events={groupedEvents.thought}
               isActive={currentPhase === 'thought'}
-              isComplete={currentPhase && ['plan', 'executing', 'summary', 'completed'].includes(currentPhase)}
+              isComplete={!!currentPhase && ['plan', 'executing', 'summary', 'completed'].includes(currentPhase)}
             />
           )}
 
@@ -79,7 +79,7 @@ export function OrchestrationStreamView({
               phase="plan"
               events={groupedEvents.plan}
               isActive={currentPhase === 'plan'}
-              isComplete={currentPhase && ['executing', 'summary', 'completed'].includes(currentPhase)}
+              isComplete={!!currentPhase && ['executing', 'summary', 'completed'].includes(currentPhase)}
             />
           )}
 
@@ -89,7 +89,7 @@ export function OrchestrationStreamView({
               phase="executing"
               events={groupedEvents.step}
               isActive={currentPhase === 'executing'}
-              isComplete={currentPhase && ['summary', 'completed'].includes(currentPhase)}
+              isComplete={!!currentPhase && ['summary', 'completed'].includes(currentPhase)}
             />
           )}
 

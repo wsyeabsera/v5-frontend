@@ -5,6 +5,7 @@ import './globals.css'
 import { Providers } from './providers'
 import { Sidebar } from '@/components/layout/Sidebar'
 import { CommandPalette } from '@/components/command-palette'
+import { Toaster } from '@/components/ui/toaster'
 
 export const metadata: Metadata = {
   title: 'Clear AI - Waste Management',
@@ -27,6 +28,7 @@ export default function RootLayout({
             </main>
           </div>
           <CommandPalette />
+          <Toaster />
         </Providers>
       </body>
     </html>

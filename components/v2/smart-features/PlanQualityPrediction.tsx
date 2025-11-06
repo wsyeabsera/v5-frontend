@@ -54,42 +54,42 @@ export function PlanQualityPrediction() {
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-sm font-medium">Success Probability</span>
                   <span className="text-sm font-bold">
-                    {(prediction.successProbability * 100).toFixed(1)}%
+                    {(((prediction as any).successProbability || 0) * 100).toFixed(1)}%
                   </span>
                 </div>
-                <Progress value={prediction.successProbability * 100} className="h-2" />
+                <Progress value={((prediction as any).successProbability || 0) * 100} className="h-2" />
               </div>
 
               <div>
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-sm font-medium">Quality Score</span>
-                  <span className="text-sm font-bold">{prediction.qualityScore}/100</span>
+                  <span className="text-sm font-bold">{(prediction as any).qualityScore || 0}/100</span>
                 </div>
-                <Progress value={prediction.qualityScore} className="h-2" />
+                <Progress value={(prediction as any).qualityScore || 0} className="h-2" />
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div className="p-4 bg-muted rounded-lg">
                 <div className="text-sm text-muted-foreground mb-1">Estimated Duration</div>
-                <div className="text-2xl font-bold">{prediction.estimatedDuration}ms</div>
+                <div className="text-2xl font-bold">{(prediction as any).estimatedDuration || 0}ms</div>
               </div>
-              {prediction.estimatedCost && (
+              {(prediction as any).estimatedCost && (
                 <div className="p-4 bg-muted rounded-lg">
                   <div className="text-sm text-muted-foreground mb-1">Estimated Cost</div>
-                  <div className="text-2xl font-bold">${prediction.estimatedCost.toFixed(4)}</div>
+                  <div className="text-2xl font-bold">${((prediction as any).estimatedCost || 0).toFixed(4)}</div>
                 </div>
               )}
             </div>
 
-            {prediction.risks && prediction.risks.length > 0 && (
+            {(prediction as any).risks && (prediction as any).risks.length > 0 && (
               <div>
                 <h4 className="font-semibold mb-2 flex items-center gap-2">
                   <AlertTriangle className="w-4 h-4" />
                   Risks
                 </h4>
                 <div className="space-y-2">
-                  {prediction.risks.map((risk: any, idx: number) => (
+                  {(prediction as any).risks.map((risk: any, idx: number) => (
                     <div key={idx} className="flex items-center gap-2">
                       <Badge
                         variant={
@@ -105,11 +105,11 @@ export function PlanQualityPrediction() {
               </div>
             )}
 
-            {prediction.recommendations && prediction.recommendations.length > 0 && (
+            {(prediction as any).recommendations && (prediction as any).recommendations.length > 0 && (
               <div>
                 <h4 className="font-semibold mb-2">Recommendations</h4>
                 <ul className="list-disc list-inside space-y-1">
-                  {prediction.recommendations.map((rec: string, idx: number) => (
+                  {(prediction as any).recommendations.map((rec: string, idx: number) => (
                     <li key={idx} className="text-sm text-muted-foreground">{rec}</li>
                   ))}
                 </ul>

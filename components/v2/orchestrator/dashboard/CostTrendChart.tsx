@@ -23,7 +23,7 @@ export function CostTrendChart({ metrics, period = 'daily' }: CostTrendChartProp
     const grouped = groupByPeriod(filtered, period)
     const aggregated: any[] = []
 
-    for (const [key, periodMetrics] of grouped.entries()) {
+    for (const [key, periodMetrics] of Array.from(grouped.entries())) {
       const cost = aggregateCost(periodMetrics)
       const firstMetric = periodMetrics[0]
       const date = new Date(firstMetric.timestamp)

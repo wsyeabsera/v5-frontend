@@ -516,6 +516,94 @@ class MCPClientOrchestrator {
   }) {
     return this.request('compare_performance', data)
   }
+
+  // Query Classification methods
+  async classifyQuery(query: string, orchestratorId: string) {
+    return this.request('classify_query', { query, orchestratorId })
+  }
+
+  // Prompt Enhancement methods
+  async enhancePrompt(
+    basePrompt: string,
+    userQuery: string,
+    orchestratorId: string,
+    phase: 'thought' | 'plan' | 'execution' | 'summary',
+    options?: {
+      includeFewShot?: boolean
+      includeContext?: boolean
+      maxFewShotExamples?: number
+      useMetaPrompting?: boolean
+    }
+  ) {
+    return this.request('enhance_prompt', {
+      basePrompt,
+      userQuery,
+      orchestratorId,
+      phase,
+      options: options || {},
+    })
+  }
+
+  // Pattern methods
+  async listPatterns(filters?: { orchestratorId?: string; patternType?: string }) {
+    return this.request('list_patterns', filters || {})
+  }
+
+  async extractPatterns(options?: {
+    orchestratorId?: string
+    startDate?: string
+    endDate?: string
+  }) {
+    return this.request('extract_patterns', options || {})
+  }
+
+  // Few-Shot Learning methods
+  async extractFewShotExamples(
+    query: string,
+    phase: 'thought' | 'plan' | 'execution' | 'summary',
+    options?: {
+      orchestratorId?: string
+      minSimilarity?: number
+      limit?: number
+      requireHighQuality?: boolean
+    }
+  ) {
+    const params: any = { query, phase }
+    if (options) {
+      if (options.orchestratorId) params.orchestratorId = options.orchestratorId
+      if (options.minSimilarity !== undefined) params.minSimilarity = options.minSimilarity
+      if (options.limit !== undefined) params.limit = options.limit
+      if (options.requireHighQuality !== undefined) params.requireHighQuality = options.requireHighQuality
+    }
+    return this.request('extract_few_shot_examples', params)
+  }
+
+  // Memory methods
+  async listMemories(filters?: {
+    orchestratorId?: string
+    category?: 'success' | 'pattern' | 'insight' | 'warning'
+    limit?: number
+  }) {
+    return this.request('list_memories', filters || {})
+  }
+
+  async retrieveMemories(
+    query: string,
+    orchestratorId: string,
+    options?: {
+      limit?: number
+      category?: 'success' | 'pattern' | 'insight' | 'warning'
+      minConfidence?: number
+      minEffectiveness?: number
+      tags?: string[]
+    }
+  ) {
+    const params: any = { query, orchestratorId }
+    if (options) {
+      Object.assign(params, options)
+    }
+    return this.request('retrieve_memories', params)
+  }
 }
 
 // Singleton instance

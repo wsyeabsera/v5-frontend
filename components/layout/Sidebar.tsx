@@ -1,6 +1,6 @@
 'use client'
 
-import { Settings, ChevronLeft, ChevronRight, MessageSquare, FileText, Brain, ListChecks, CheckSquare, GitBranch, Wrench, FolderOpen, Search, ListTodo, Zap, ChevronDown, FileText as FileTextIcon, Database, History, BarChart3, Sparkles, Network, Play, Cpu, Users, Activity, LayoutDashboard } from 'lucide-react'
+import { Settings, ChevronLeft, ChevronRight, MessageSquare, FileText, Brain, ListChecks, CheckSquare, GitBranch, Wrench, FolderOpen, Search, ListTodo, Zap, ChevronDown, FileText as FileTextIcon, Database, History, BarChart3, Sparkles, Network, Play, Cpu, Users, Activity, LayoutDashboard, Tag, BookOpen } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useState, useEffect } from 'react'
@@ -63,6 +63,12 @@ const navigation = [
       { name: 'Intelligence Dashboard', href: '/v2/orchestrator/intelligence/dashboard', icon: Brain },
       { name: 'Semantic Search', href: '/v2/orchestrator/intelligence/semantic-search', icon: Search },
       { name: 'Embeddings Status', href: '/v2/orchestrator/intelligence/embeddings', icon: Database },
+      { name: 'Query Classification', href: '/v2/orchestrator/intelligence/classification', icon: Tag },
+      { name: 'Prompt Enhancement', href: '/v2/orchestrator/intelligence/prompt-enhancement', icon: Sparkles },
+      { name: 'Pattern Insights', href: '/v2/orchestrator/intelligence/patterns', icon: Network },
+      { name: 'Few-Shot Learning', href: '/v2/orchestrator/intelligence/few-shot', icon: BookOpen },
+      { name: 'Memory Analytics', href: '/v2/orchestrator/intelligence/memory-analytics', icon: Database },
+      { name: 'Intelligence Comparison', href: '/v2/orchestrator/intelligence/comparison', icon: BarChart3 },
     ]
   },
 ]

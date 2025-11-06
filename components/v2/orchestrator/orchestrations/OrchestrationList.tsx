@@ -426,11 +426,11 @@ export function OrchestrationList() {
                         {getPhaseIndicators(orchestration).map((phaseInfo, idx) => (
                           <div key={idx} className="flex items-center">
                             {phaseInfo.completed ? (
-                              <CheckCircle2 className="w-4 h-4 text-green-500" title={`${phaseInfo.phase} completed`} />
+                              <CheckCircle2 className="w-4 h-4 text-green-500" />
                             ) : phaseInfo.started ? (
-                              <Circle className="w-4 h-4 text-yellow-500 fill-yellow-500" title={`${phaseInfo.phase} in progress`} />
+                              <Circle className="w-4 h-4 text-yellow-500 fill-yellow-500" />
                             ) : (
-                              <Circle className="w-4 h-4 text-gray-300" title={`${phaseInfo.phase} pending`} />
+                              <Circle className="w-4 h-4 text-gray-300" />
                             )}
                           </div>
                         ))}

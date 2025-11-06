@@ -349,14 +349,14 @@ export function OrchestrationViewDialog({
                 <div className="space-y-2">
                   <div className="text-sm font-medium text-muted-foreground">All Timestamps</div>
                   <div className="space-y-1 text-xs font-mono">
-                    {Object.entries(timestamps).map(([key, value]) => (
-                      value && (
+                    {Object.entries(timestamps).map(([key, value]) =>
+                      value ? (
                         <div key={key} className="flex justify-between">
                           <span className="text-muted-foreground">{key}:</span>
                           <span>{formatDate(value as string)}</span>
                         </div>
-                      )
-                    ))}
+                      ) : null
+                    )}
                   </div>
                 </div>
 

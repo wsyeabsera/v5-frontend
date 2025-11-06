@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useMemo } from 'react'
 import { mcpClientV2 } from './mcp-client-v2'
 import { mcpClientOrchestrator } from './mcp-client-orchestrator'
 
@@ -1185,5 +1186,359 @@ export function useComparePerformance() {
       startDate?: string
       endDate?: string
     }) => mcpClientOrchestrator.comparePerformance(data),
+  })
+}
+
+// Query Classification hooks
+export function useClassifyQuery() {
+  return useMutation({
+    mutationFn: ({ query, orchestratorId }: { query: string; orchestratorId: string }) =>
+      mcpClientOrchestrator.classifyQuery(query, orchestratorId),
+  })
+}
+
+// Prompt Enhancement hooks
+export function useEnhancePrompt() {
+  return useMutation({
+    mutationFn: ({
+      basePrompt,
+      userQuery,
+      orchestratorId,
+      phase,
+      options,
+    }: {
+      basePrompt: string
+      userQuery: string
+      orchestratorId: string
+      phase: 'thought' | 'plan' | 'execution' | 'summary'
+      options?: {
+        includeFewShot?: boolean
+        includeContext?: boolean
+        maxFewShotExamples?: number
+        useMetaPrompting?: boolean
+      }
+    }) => mcpClientOrchestrator.enhancePrompt(basePrompt, userQuery, orchestratorId, phase, options),
+  })
+}
+
+// Pattern hooks
+export function usePatterns(filters?: { orchestratorId?: string; patternType?: string }) {
+  return useQuery({
+    queryKey: ['intelligence', 'patterns', filters],
+    queryFn: () => mcpClientOrchestrator.listPatterns(filters),
+    staleTime: 1000 * 60 * 5, // 5 minutes
+  })
+}
+
+export function useExtractPatterns() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (options?: {
+      orchestratorId?: string
+      startDate?: string
+      endDate?: string
+    }) => mcpClientOrchestrator.extractPatterns(options),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['intelligence', 'patterns'] })
+    },
+  })
+}
+
+// Few-Shot Learning hooks
+export function useFewShotExamples(filters?: {
+  query?: string
+  phase?: 'thought' | 'plan' | 'execution' | 'summary'
+  orchestratorId?: string
+  minSimilarity?: number
+  limit?: number
+  requireHighQuality?: boolean
+}) {
+  return useQuery({
+    queryKey: ['intelligence', 'few-shot', 'examples', filters],
+    queryFn: async () => {
+      if (!filters?.query || !filters?.phase) {
+        return { examples: [], count: 0, averageSimilarity: 0, averageConfidence: 0 }
+      }
+      return mcpClientOrchestrator.extractFewShotExamples(
+        filters.query,
+        filters.phase,
+        {
+          orchestratorId: filters.orchestratorId,
+          minSimilarity: filters.minSimilarity,
+          limit: filters.limit,
+          requireHighQuality: filters.requireHighQuality,
+        }
+      )
+    },
+    enabled: !!filters?.query && !!filters?.phase,
+    staleTime: 1000 * 60 * 5,
+  })
+}
+
+export function useFewShotEffectiveness(filters?: {
+  phase?: 'thought' | 'plan' | 'execution' | 'summary'
+  orchestratorId?: string
+}) {
+  // Compute effectiveness from examples data
+  const { data: examplesData } = useFewShotExamples({
+    query: '', // Will be disabled without query
+    phase: filters?.phase,
+    orchestratorId: filters?.orchestratorId,
+  })
+
+  return useMemo(() => {
+    if (!examplesData?.examples) {
+      return {
+        totalExamples: 0,
+        avgSimilarity: 0,
+        avgConfidence: 0,
+        highQualityCount: 0,
+      }
+    }
+
+    const examples = examplesData.examples || []
+    const totalExamples = examples.length
+    const avgSimilarity = examplesData.averageSimilarity || 0
+    const avgConfidence = examplesData.averageConfidence || 0
+    const highQualityCount = examples.filter((e: any) => e.quality && e.quality >= 80).length
+
+    return {
+      totalExamples,
+      avgSimilarity,
+      avgConfidence,
+      highQualityCount,
+    }
+  }, [examplesData])
+}
+
+// Memory hooks
+export function useMemoryList(filters?: {
+  orchestratorId?: string
+  category?: 'success' | 'pattern' | 'insight' | 'warning'
+  limit?: number
+}) {
+  return useQuery({
+    queryKey: ['intelligence', 'memory', 'list', filters],
+    queryFn: () => mcpClientOrchestrator.listMemories(filters),
+    staleTime: 1000 * 60 * 5,
+  })
+}
+
+export function useMemoryAnalytics() {
+  const { data: memoryData, isLoading } = useMemoryList()
+
+  const analytics = useMemo(() => {
+    if (!memoryData?.memories) {
+      return {
+        totalMemories: 0,
+        avgEffectiveness: 0,
+        totalUsage: 0,
+        categoryBreakdown: {},
+      }
+    }
+
+    const memories = memoryData.memories || []
+    const totalMemories = memories.length
+    const totalUsage = memories.reduce((sum: number, m: any) => sum + (m.usageCount || 0), 0)
+    const avgEffectiveness =
+      memories.length > 0
+        ? memories.reduce((sum: number, m: any) => sum + (m.effectiveness || 0), 0) / memories.length
+        : 0
+
+    const categoryBreakdown: Record<string, number> = {}
+    memories.forEach((m: any) => {
+      const cat = m.category || 'unknown'
+      categoryBreakdown[cat] = (categoryBreakdown[cat] || 0) + 1
+    })
+
+    return {
+      totalMemories,
+      avgEffectiveness,
+      totalUsage,
+      categoryBreakdown,
+    }
+  }, [memoryData])
+
+  return { data: analytics, isLoading }
+}
+
+export function useMemoryEffectiveness(filters?: {
+  category?: 'success' | 'pattern' | 'insight' | 'warning'
+  minEffectiveness?: number
+}) {
+  const { data: memoryData } = useMemoryList({ category: filters?.category })
+
+  return useMemo(() => {
+    if (!memoryData?.memories) {
+      return []
+    }
+
+    let memories = memoryData.memories || []
+
+    if (filters?.minEffectiveness) {
+      memories = memories.filter((m: any) => (m.effectiveness || 0) >= filters.minEffectiveness!)
+    }
+
+    return memories
+      .sort((a: any, b: any) => (b.effectiveness || 0) - (a.effectiveness || 0))
+      .map((m: any) => ({
+        memoryId: m.memoryId,
+        title: m.title || 'Untitled',
+        category: m.category,
+        effectiveness: m.effectiveness || 0,
+        usageCount: m.usageCount || 0,
+        successRate: m.successRate || 0,
+        description: m.description || '',
+      }))
+  }, [memoryData, filters])
+}
+
+export function useMemoryUsage() {
+  const { data: memoryData, isLoading } = useMemoryList()
+
+  const usage = useMemo(() => {
+    if (!memoryData?.memories) {
+      return {
+        usagePatterns: [],
+        retrievalTrends: [],
+      }
+    }
+
+    const memories = memoryData.memories || []
+    const usagePatterns = memories
+      .map((m: any) => ({
+        memoryId: m.memoryId,
+        category: m.category,
+        usageCount: m.usageCount || 0,
+      }))
+      .sort((a: any, b: any) => b.usageCount - a.usageCount)
+
+    return {
+      usagePatterns,
+      retrievalTrends: usagePatterns,
+    }
+  }, [memoryData])
+
+  return { data: usage, isLoading }
+}
+
+// Intelligence Comparison hooks
+export function useIntelligenceComparison(filters?: {
+  orchestratorId?: string
+  dateRange?: string
+}) {
+  const { data: metrics, isLoading } = useQuery({
+    queryKey: ['intelligence', 'comparison', 'metrics', filters],
+    queryFn: () =>
+      mcpClientOrchestrator.getPerformanceMetrics({
+        orchestratorId: filters?.orchestratorId,
+      }),
+    staleTime: 1000 * 60 * 5,
+  })
+
+  const comparison = useMemo(() => {
+    if (!metrics || !Array.isArray(metrics) || metrics.length === 0) {
+      return {
+        withIntelligence: { count: 0, successRate: 0, avgConfidence: 0, avgQuality: 0, avgLatency: 0 },
+        withoutIntelligence: { count: 0, successRate: 0, avgConfidence: 0, avgQuality: 0, avgLatency: 0 },
+      }
+    }
+
+    // Separate metrics by whether they used intelligence features
+    // We'll use a heuristic: if confidence/quality scores exist, assume intelligence was used
+    const withIntelligence = metrics.filter(
+      (m: any) => m.confidence?.overall || m.quality?.outputCompleteness
+    )
+    const withoutIntelligence = metrics.filter(
+      (m: any) => !m.confidence?.overall && !m.quality?.outputCompleteness
+    )
+
+    const calcStats = (items: any[]) => {
+      if (items.length === 0) {
+        return { count: 0, successRate: 0, avgConfidence: 0, avgQuality: 0, avgLatency: 0 }
+      }
+
+      const successCount = items.filter((m: any) => m.execution?.status === 'success').length
+      const successRate = (successCount / items.length) * 100
+
+      const confidences = items
+        .map((m: any) => m.confidence?.overall)
+        .filter((c: any) => c !== undefined)
+      const avgConfidence = confidences.length > 0 ? confidences.reduce((a: number, b: number) => a + b, 0) / confidences.length : 0
+
+      const qualities = items
+        .map((m: any) => m.quality?.outputCompleteness)
+        .filter((q: any) => q !== undefined)
+      const avgQuality = qualities.length > 0 ? qualities.reduce((a: number, b: number) => a + b, 0) / qualities.length : 0
+
+      const latencies = items
+        .map((m: any) => m.execution?.latency?.total)
+        .filter((l: any) => l !== undefined)
+      const avgLatency = latencies.length > 0 ? latencies.reduce((a: number, b: number) => a + b, 0) / latencies.length : 0
+
+      return {
+        count: items.length,
+        successRate,
+        avgConfidence,
+        avgQuality,
+        avgLatency,
+      }
+    }
+
+    return {
+      withIntelligence: calcStats(withIntelligence),
+      withoutIntelligence: calcStats(withoutIntelligence),
+    }
+  }, [metrics])
+
+  return { data: comparison, isLoading }
+}
+
+export function useFeatureImpact(filters?: { orchestratorId?: string }) {
+  const { data: comparison, isLoading } = useIntelligenceComparison(filters)
+
+  const impact = useMemo(() => {
+    if (!comparison) {
+      return {
+        impact: [],
+        recommendations: [],
+      }
+    }
+
+    const impactData = [
+      {
+        feature: 'Confidence Scoring',
+        improvement: comparison.withIntelligence.avgConfidence - comparison.withoutIntelligence.avgConfidence,
+      },
+      {
+        feature: 'Quality Metrics',
+        improvement: comparison.withIntelligence.avgQuality - comparison.withoutIntelligence.avgQuality,
+      },
+      {
+        feature: 'Success Rate',
+        improvement: comparison.withIntelligence.successRate - comparison.withoutIntelligence.successRate,
+      },
+    ]
+
+    return {
+      impact: impactData,
+      recommendations: impactData.filter((i) => i.improvement > 0),
+    }
+  }, [comparison])
+
+  return { data: impact, isLoading }
+}
+
+export function usePerformanceComparison(filters?: {
+  orchestratorId?: string
+  dateRange?: string
+}) {
+  return useQuery({
+    queryKey: ['intelligence', 'performance-comparison', filters],
+    queryFn: () =>
+      mcpClientOrchestrator.getPerformanceMetrics({
+        orchestratorId: filters?.orchestratorId,
+      }),
+    staleTime: 1000 * 60 * 5,
   })
 }
