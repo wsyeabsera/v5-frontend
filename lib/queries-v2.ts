@@ -940,6 +940,17 @@ export function useOrchestration(id: string) {
   })
 }
 
+// Hook for getting orchestration (no polling - use SSE for real-time updates)
+export function useGetOrchestration(executionId: string) {
+  return useQuery({
+    queryKey: ['orchestration', executionId],
+    queryFn: () => mcpClientOrchestrator.getOrchestration(executionId),
+    enabled: !!executionId,
+    // No polling - use SSE streaming for real-time updates during execution
+    staleTime: 1000 * 60 * 2, // 2 minutes for completed executions
+  })
+}
+
 // Intelligence Dashboard hooks
 export function useIntelligenceStats(timeRange?: string) {
   return useQuery({
@@ -1540,5 +1551,92 @@ export function usePerformanceComparison(filters?: {
         orchestratorId: filters?.orchestratorId,
       }),
     staleTime: 1000 * 60 * 5,
+  })
+}
+
+// Test Prompt hooks
+export function useTestPrompts(filters?: {
+  categories?: string[]
+  tags?: string[]
+  version?: string
+}) {
+  return useQuery({
+    queryKey: ['test-prompts', filters],
+    queryFn: () => mcpClientOrchestrator.listTestPrompts(filters),
+    staleTime: 1000 * 60 * 5,
+  })
+}
+
+export function useGetTestPrompt(promptId: string) {
+  return useQuery({
+    queryKey: ['test-prompt', promptId],
+    queryFn: () => mcpClientOrchestrator.getTestPrompt(promptId),
+    enabled: !!promptId,
+    staleTime: 1000 * 60 * 5,
+  })
+}
+
+export function useCreateTestPrompt() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (data: Parameters<typeof mcpClientOrchestrator.createTestPrompt>[0]) =>
+      mcpClientOrchestrator.createTestPrompt(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['test-prompts'] })
+    },
+  })
+}
+
+export function useUpdateTestPrompt() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({
+      promptId,
+      ...data
+    }: {
+      promptId: string
+    } & Partial<Parameters<typeof mcpClientOrchestrator.createTestPrompt>[0]>) =>
+      mcpClientOrchestrator.updateTestPrompt(promptId, data),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['test-prompts'] })
+      queryClient.invalidateQueries({ queryKey: ['test-prompt', variables.promptId] })
+    },
+  })
+}
+
+export function useDeleteTestPrompt() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (promptId: string) => mcpClientOrchestrator.deleteTestPrompt(promptId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['test-prompts'] })
+    },
+  })
+}
+
+// Test Execution hooks
+export function useRunTestPrompt() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (data: Parameters<typeof mcpClientOrchestrator.runTestPrompt>[0]) => {
+      console.log('[useRunTestPrompt] Calling runTestPrompt with:', data)
+      const result = await mcpClientOrchestrator.runTestPrompt(data)
+      console.log('[useRunTestPrompt] Raw result:', result)
+      return result
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['test-runs'] })
+      queryClient.invalidateQueries({ queryKey: ['test-prompts'] })
+    },
+  })
+}
+
+export function useGetTestRun(runId: string) {
+  return useQuery({
+    queryKey: ['test-run', runId],
+    queryFn: () => mcpClientOrchestrator.getTestRun(runId),
+    enabled: !!runId,
+    // No polling - use SSE streaming for real-time updates during execution
+    staleTime: 1000 * 60 * 2, // 2 minutes for completed tests
   })
 }

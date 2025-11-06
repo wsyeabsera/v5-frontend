@@ -100,22 +100,22 @@ export function OrchestrationViewDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh]">
-        <DialogHeader>
+      <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col overflow-hidden">
+        <DialogHeader className="flex-shrink-0">
           <DialogTitle>Orchestration Details</DialogTitle>
           <DialogDescription>Execution details and results</DialogDescription>
         </DialogHeader>
 
-        <Tabs defaultValue="overview" className="w-full">
-          <TabsList className="grid w-full grid-cols-4">
+        <Tabs defaultValue="overview" className="w-full flex flex-col flex-1 min-h-0">
+          <TabsList className="grid w-full grid-cols-4 flex-shrink-0">
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="phases">Phases</TabsTrigger>
             <TabsTrigger value="results">Results</TabsTrigger>
             <TabsTrigger value="details">Details</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="overview" className="space-y-4">
-            <ScrollArea className="max-h-[60vh] pr-4">
+          <TabsContent value="overview" className="space-y-4 flex-1 min-h-0 mt-4">
+            <ScrollArea className="h-full pr-4">
               <div className="space-y-4 py-4">
                 {/* Status and Execution ID */}
                 <div className="grid grid-cols-2 gap-4">
@@ -182,8 +182,8 @@ export function OrchestrationViewDialog({
             </ScrollArea>
           </TabsContent>
 
-          <TabsContent value="phases" className="space-y-4">
-            <ScrollArea className="max-h-[60vh] pr-4">
+          <TabsContent value="phases" className="space-y-4 flex-1 min-h-0 mt-4">
+            <ScrollArea className="h-full pr-4">
               <div className="space-y-4 py-4">
                 {phases.map((phase) => {
                   const phaseStatus = getPhaseStatus(phase, timestamps)
@@ -223,8 +223,8 @@ export function OrchestrationViewDialog({
             </ScrollArea>
           </TabsContent>
 
-          <TabsContent value="results" className="space-y-4">
-            <ScrollArea className="max-h-[60vh] pr-4">
+          <TabsContent value="results" className="space-y-4 flex-1 min-h-0 mt-4">
+            <ScrollArea className="h-full pr-4">
               <div className="space-y-4 py-4">
                 {displayOrchestration.results && (
                   <>
@@ -295,8 +295,8 @@ export function OrchestrationViewDialog({
             </ScrollArea>
           </TabsContent>
 
-          <TabsContent value="details" className="space-y-4">
-            <ScrollArea className="max-h-[60vh] pr-4">
+          <TabsContent value="details" className="space-y-4 flex-1 min-h-0 mt-4">
+            <ScrollArea className="h-full pr-4">
               <div className="space-y-4 py-4">
                 {/* Conversation History */}
                 {displayOrchestration.conversationHistory && displayOrchestration.conversationHistory.length > 0 && (

@@ -8,6 +8,7 @@ interface DashboardLayoutProps {
   title: string
   description?: string
   timeRangeSelector?: ReactNode
+  actions?: ReactNode
   children: ReactNode
   isLoading?: boolean
   error?: Error | null
@@ -17,6 +18,7 @@ export function DashboardLayout({
   title,
   description,
   timeRangeSelector,
+  actions,
   children,
   isLoading,
   error,
@@ -51,7 +53,10 @@ export function DashboardLayout({
           <h1 className="text-4xl font-bold tracking-tight">{title}</h1>
           {description && <p className="text-muted-foreground mt-2">{description}</p>}
         </div>
-        {timeRangeSelector && <div>{timeRangeSelector}</div>}
+        <div className="flex items-center gap-4">
+          {timeRangeSelector && <div>{timeRangeSelector}</div>}
+          {actions && <div>{actions}</div>}
+        </div>
       </div>
       {children}
     </div>

@@ -48,8 +48,11 @@ export class SSEClient {
       }
     }
 
-    // Handle specific event types
-    const eventTypes = ['thought', 'plan', 'step', 'user_input_required', 'summary', 'error', 'complete']
+    // Handle specific event types (orchestration and test events)
+    const eventTypes = [
+      'thought', 'plan', 'step', 'user_input_required', 'summary', 'error', 'complete',
+      'test_started', 'test_phase', 'test_user_input_required', 'test_complete'
+    ]
     eventTypes.forEach((eventType) => {
       this.eventSource!.addEventListener(eventType, (event: any) => {
         try {

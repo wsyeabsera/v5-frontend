@@ -19,61 +19,79 @@ class MCPClientOrchestrator {
   async request(method: string, params: any = {}, options?: { preserveNewlines?: boolean }) {
     const id = this.generateId()
 
-    const response = await fetch(this.url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        jsonrpc: '2.0',
-        id,
-        method: 'tools/call',
-        params: {
-          name: method,
-          arguments: params,
+    // For test execution, use a longer timeout
+    const isTestExecution = method === 'run_test_prompt'
+    const timeout = isTestExecution ? (params.timeout || 300000) + 120000 : 30000 // Add 2 min buffer for tests
+
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), timeout)
+
+    try {
+      const response = await fetch(this.url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
         },
-        options: options || {},
-      }),
-    })
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          id,
+          method: 'tools/call',
+          params: {
+            name: method,
+            arguments: params,
+          },
+          options: options || {},
+        }),
+        signal: controller.signal,
+      })
 
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({ error: 'Unknown error' }))
-      throw new Error(errorData.error || `HTTP error! status: ${response.status}`)
-    }
+      clearTimeout(timeoutId)
 
-    const data = await response.json()
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }))
+        throw new Error(errorData.error || `HTTP error! status: ${response.status}`)
+      }
 
-    if (data.error) {
-      throw new Error(data.error.message || 'MCP request failed')
-    }
+      const data = await response.json()
 
-    if (data.result?.isError) {
-      const errorText = data.result.content?.[0]?.text || 'Unknown error'
-      throw new Error(errorText)
-    }
+      if (data.error) {
+        throw new Error(data.error.message || 'MCP request failed')
+      }
 
-    // The API route should already have cleaned and parsed the result
-    // So data.result should already be the parsed object/array
-    // But if it still has content array, parse it
-    if (data.result?.content && Array.isArray(data.result.content)) {
-      const textContent = data.result.content
-        .map((item: any) => item?.text || '')
-        .join('')
-        .trim()
+      if (data.result?.isError) {
+        const errorText = data.result.content?.[0]?.text || 'Unknown error'
+        throw new Error(errorText)
+      }
 
-      if (textContent) {
-        try {
-          const parsed = JSON.parse(textContent)
-          return parsed
-        } catch {
-          // If parsing fails, return as-is (might be a string)
-          return textContent
+      // The API route should already have cleaned and parsed the result
+      // So data.result should already be the parsed object/array
+      // But if it still has content array, parse it
+      if (data.result?.content && Array.isArray(data.result.content)) {
+        const textContent = data.result.content
+          .map((item: any) => item?.text || '')
+          .join('')
+          .trim()
+
+        if (textContent) {
+          try {
+            const parsed = JSON.parse(textContent)
+            return parsed
+          } catch {
+            // If parsing fails, return as-is (might be a string)
+            return textContent
+          }
         }
       }
-    }
 
-    // Return the result directly - it should already be parsed by the API route
-    return data.result
+      // Return the result directly - it should already be parsed by the API route
+      return data.result
+    } catch (error: any) {
+      clearTimeout(timeoutId)
+      if (error.name === 'AbortError') {
+        throw new Error(`Request timed out after ${timeout}ms. The test execution may be taking longer than expected.`)
+      }
+      throw error
+    }
   }
 
   // Available Models methods
@@ -603,6 +621,80 @@ class MCPClientOrchestrator {
       Object.assign(params, options)
     }
     return this.request('retrieve_memories', params)
+  }
+
+  // Test Prompt methods
+  async createTestPrompt(data: {
+    query: string
+    name?: string
+    description?: string
+    categories: string[]
+    tags?: string[]
+    version?: string
+    userInputs?: Array<{
+      stepId?: string
+      field: string
+      value: any
+      description?: string
+      order?: number
+    }>
+    expectedOutcome?: {
+      success: boolean
+      expectedPhases?: string[]
+      maxDuration?: number
+      expectedResults?: any
+    }
+    metadata?: {
+      difficulty?: 'easy' | 'medium' | 'hard'
+      priority?: 'low' | 'medium' | 'high'
+      source?: string
+      domain?: string
+      author?: string
+    }
+  }) {
+    return this.request('create_test_prompt', { ...data, stream: false })
+  }
+
+  async getTestPrompt(promptId: string) {
+    return this.request('get_test_prompt', { promptId, stream: false })
+  }
+
+  async listTestPrompts(filters?: {
+    categories?: string[]
+    tags?: string[]
+    version?: string
+    limit?: number
+    skip?: number
+  }) {
+    const params: any = { stream: false }
+    if (filters) {
+      Object.assign(params, filters)
+    }
+    return this.request('list_test_prompts', params)
+  }
+
+  async updateTestPrompt(
+    promptId: string,
+    data: Partial<Parameters<typeof this.createTestPrompt>[0]>
+  ) {
+    return this.request('update_test_prompt', { promptId, ...data, stream: false })
+  }
+
+  async deleteTestPrompt(promptId: string) {
+    return this.request('delete_test_prompt', { promptId, stream: false })
+  }
+
+  // Test Execution methods
+  async runTestPrompt(data: {
+    promptId: string
+    orchestratorId: string
+    timeout?: number
+  }) {
+    return this.request('run_test_prompt', { ...data, stream: false })
+  }
+
+  async getTestRun(runId: string) {
+    return this.request('get_test_run', { runId, stream: false })
   }
 }
 

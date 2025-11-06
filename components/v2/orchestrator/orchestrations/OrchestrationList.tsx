@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useMemo } from 'react'
+import { useRouter } from 'next/navigation'
 import { useOrchestrationExecutions, useOrchestrators } from '@/lib/queries-v2'
 import { OrchestrationCard } from './OrchestrationCard'
 import { OrchestrationDashboard } from './OrchestrationDashboard'
@@ -26,6 +27,7 @@ type SortField = 'timestamp' | 'status' | 'duration'
 type SortDirection = 'asc' | 'desc'
 
 export function OrchestrationList() {
+  const router = useRouter()
   const [orchestratorFilter, setOrchestratorFilter] = useState<string>('all')
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [viewMode, setViewMode] = useState<'cards' | 'table'>('table')
@@ -195,7 +197,16 @@ export function OrchestrationList() {
     })
   }
 
-  const handleView = (orchestration: any) => {
+  const handleView = (orchestration: any, event?: React.MouseEvent) => {
+    // If Ctrl/Cmd is pressed, open in new tab, otherwise navigate
+    if (event?.ctrlKey || event?.metaKey) {
+      window.open(`/v2/orchestrator/orchestrations/${orchestration._id}`, '_blank')
+    } else {
+      router.push(`/v2/orchestrator/orchestrations/${orchestration._id}`)
+    }
+  }
+
+  const handleViewModal = (orchestration: any) => {
     setSelectedOrchestration(orchestration)
     setViewDialogOpen(true)
   }
@@ -450,11 +461,21 @@ export function OrchestrationList() {
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => handleView(orchestration)}
+                          onClick={(e) => handleView(orchestration, e)}
                           className="gap-1"
+                          title="Click to view details (Ctrl/Cmd+Click for new tab)"
                         >
                           <Eye className="w-3 h-3" />
                           View
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleViewModal(orchestration)}
+                          className="gap-1"
+                          title="Quick preview"
+                        >
+                          <Eye className="w-3 h-3" />
                         </Button>
                         <Button
                           variant="default"
@@ -483,7 +504,7 @@ export function OrchestrationList() {
             >
               <OrchestrationCard
                 orchestration={orchestration}
-                onView={handleView}
+                onView={(orch) => router.push(`/v2/orchestrator/orchestrations/${orch._id}`)}
                 onExecute={() => handleExecute(orchestration.orchestratorId)}
               />
             </div>
