@@ -1,6 +1,6 @@
 'use client'
 
-import { Settings, ChevronLeft, ChevronRight, MessageSquare, FileText, Brain, ListChecks, CheckSquare, GitBranch, Wrench, FolderOpen, Search, ListTodo, Zap, ChevronDown, FileText as FileTextIcon, Database, History, BarChart3, Sparkles, Network } from 'lucide-react'
+import { Settings, ChevronLeft, ChevronRight, MessageSquare, FileText, Brain, ListChecks, CheckSquare, GitBranch, Wrench, FolderOpen, Search, ListTodo, Zap, ChevronDown, FileText as FileTextIcon, Database, History, BarChart3, Sparkles, Network, Play, Cpu, Users, Activity, LayoutDashboard } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useState, useEffect } from 'react'
@@ -50,6 +50,21 @@ const navigation = [
       { name: 'Pattern Recognition', href: '/v2/pattern-recognition', icon: Network },
     ]
   },
+  {
+    group: 'Orchestrator',
+    items: [
+      { name: 'Dashboard', href: '/v2/orchestrator/dashboard', icon: LayoutDashboard },
+      { name: 'Analytics', href: '/v2/orchestrator/analytics', icon: BarChart3 },
+      { name: 'Orchestrations', href: '/v2/orchestrator/orchestrations', icon: Play },
+      { name: 'Performance Metrics', href: '/v2/orchestrator/performance', icon: Activity },
+      { name: 'Orchestrators', href: '/v2/orchestrator/orchestrators', icon: Network },
+      { name: 'Agent Configs', href: '/v2/orchestrator/agent-configs', icon: Users },
+      { name: 'Available Models', href: '/v2/orchestrator/available-models', icon: Cpu },
+      { name: 'Intelligence Dashboard', href: '/v2/orchestrator/intelligence/dashboard', icon: Brain },
+      { name: 'Semantic Search', href: '/v2/orchestrator/intelligence/semantic-search', icon: Search },
+      { name: 'Embeddings Status', href: '/v2/orchestrator/intelligence/embeddings', icon: Database },
+    ]
+  },
 ]
 
 export function Sidebar() {
@@ -58,9 +73,14 @@ export function Sidebar() {
   
   // Initialize group states from localStorage
   const [groupStates, setGroupStates] = useState<Record<string, boolean>>(() => {
-    if (typeof window === 'undefined') return {}
+    if (typeof window === 'undefined') return { Orchestrator: true }
     const saved = localStorage.getItem('sidebar-group-states')
-    return saved ? JSON.parse(saved) : {}
+    const parsed = saved ? JSON.parse(saved) : {}
+    // Ensure Orchestrator group is open by default
+    if (!('Orchestrator' in parsed)) {
+      parsed.Orchestrator = true
+    }
+    return parsed
   })
 
   // Save group states to localStorage when they change

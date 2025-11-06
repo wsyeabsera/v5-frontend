@@ -221,6 +221,10 @@ class MCPClientV2 {
     return this.request('resume_task', { taskId, userInputs })
   }
 
+  async getTask(taskId: string) {
+    return this.request('get_task', { taskId })
+  }
+
   // Task summary methods
   async summarizeTask(
     taskId: string,

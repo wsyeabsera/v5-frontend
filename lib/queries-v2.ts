@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { mcpClientV2 } from './mcp-client-v2'
+import { mcpClientOrchestrator } from './mcp-client-orchestrator'
 
 // Available Models hooks
 export function useAvailableModels(provider?: string) {
@@ -703,5 +704,486 @@ export function useExtractRemotePrompt() {
   return useMutation({
     mutationFn: ({ name, arguments: args }: { name: string; arguments?: Record<string, any> }) =>
       callMCPTool('extract_remote_prompt', { name, arguments: args || {} }),
+  })
+}
+
+// ============================================================================
+// Orchestrator Management Hooks (port 5001)
+// ============================================================================
+
+// Available Models hooks
+export function useOrchestratorAvailableModels(provider?: string) {
+  return useQuery({
+    queryKey: ['orchestrator', 'available-models', provider],
+    queryFn: () => mcpClientOrchestrator.listAvailableModels(provider),
+    staleTime: 1000 * 60 * 5,
+  })
+}
+
+export function useOrchestratorAvailableModel(id: string) {
+  return useQuery({
+    queryKey: ['orchestrator', 'available-model', id],
+    queryFn: () => mcpClientOrchestrator.getAvailableModel(id),
+    enabled: !!id,
+    staleTime: 1000 * 60 * 5,
+  })
+}
+
+export function useCreateOrchestratorAvailableModel() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ provider, modelName, modelId }: { provider: string; modelName: string; modelId?: string }) =>
+      mcpClientOrchestrator.createAvailableModel(provider, modelName, modelId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['orchestrator', 'available-models'] })
+    },
+  })
+}
+
+export function useUpdateOrchestratorAvailableModel() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({
+      id,
+      updates,
+    }: {
+      id: string
+      updates: { provider?: string; modelName?: string; modelId?: string }
+    }) => mcpClientOrchestrator.updateAvailableModel(id, updates),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['orchestrator', 'available-models'] })
+      queryClient.invalidateQueries({ queryKey: ['orchestrator', 'available-model', variables.id] })
+    },
+  })
+}
+
+export function useDeleteOrchestratorAvailableModel() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => mcpClientOrchestrator.deleteAvailableModel(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['orchestrator', 'available-models'] })
+    },
+  })
+}
+
+// Agent Config hooks
+export function useOrchestratorAgentConfigs(isEnabled?: boolean) {
+  return useQuery({
+    queryKey: ['orchestrator', 'agent-configs', isEnabled],
+    queryFn: () => mcpClientOrchestrator.listAgentConfigs(isEnabled),
+    staleTime: 1000 * 60 * 5,
+  })
+}
+
+export function useOrchestratorAgentConfig(id: string) {
+  return useQuery({
+    queryKey: ['orchestrator', 'agent-config', id],
+    queryFn: () => mcpClientOrchestrator.getAgentConfig(id),
+    enabled: !!id,
+    staleTime: 1000 * 60 * 5,
+  })
+}
+
+export function useCreateOrchestratorAgentConfig() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({
+      availableModelId,
+      apiKey,
+      maxTokenCount,
+      isEnabled = true,
+    }: {
+      availableModelId: string
+      apiKey: string
+      maxTokenCount: number
+      isEnabled?: boolean
+    }) =>
+      mcpClientOrchestrator.createAgentConfig(availableModelId, apiKey, maxTokenCount, isEnabled),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['orchestrator', 'agent-configs'] })
+    },
+  })
+}
+
+export function useUpdateOrchestratorAgentConfig() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({
+      id,
+      updates,
+    }: {
+      id: string
+      updates: {
+        availableModelId?: string
+        apiKey?: string
+        maxTokenCount?: number
+        isEnabled?: boolean
+      }
+    }) => mcpClientOrchestrator.updateAgentConfig(id, updates),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['orchestrator', 'agent-configs'] })
+      queryClient.invalidateQueries({ queryKey: ['orchestrator', 'agent-config', variables.id] })
+    },
+  })
+}
+
+export function useDeleteOrchestratorAgentConfig() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => mcpClientOrchestrator.deleteAgentConfig(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['orchestrator', 'agent-configs'] })
+    },
+  })
+}
+
+// Orchestrator hooks
+export function useOrchestrators(filters?: { name?: string; status?: string }) {
+  return useQuery({
+    queryKey: ['orchestrator', 'orchestrators', filters],
+    queryFn: () => mcpClientOrchestrator.listOrchestrators(filters),
+    staleTime: 1000 * 60 * 5,
+  })
+}
+
+export function useOrchestrator(id: string) {
+  return useQuery({
+    queryKey: ['orchestrator', 'orchestrator', id],
+    queryFn: () => mcpClientOrchestrator.getOrchestrator(id),
+    enabled: !!id,
+    staleTime: 1000 * 60 * 5,
+  })
+}
+
+export function useCreateOrchestrator() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (data: {
+      name: string
+      description?: string
+      status?: string
+      config?: any
+    }) => mcpClientOrchestrator.createOrchestrator(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['orchestrator', 'orchestrators'] })
+    },
+  })
+}
+
+export function useUpdateOrchestrator() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({
+      id,
+      updates,
+    }: {
+      id: string
+      updates: {
+        name?: string
+        description?: string
+        status?: string
+        config?: any
+      }
+    }) => mcpClientOrchestrator.updateOrchestrator(id, updates),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['orchestrator', 'orchestrators'] })
+      queryClient.invalidateQueries({ queryKey: ['orchestrator', 'orchestrator', variables.id] })
+    },
+  })
+}
+
+export function useDeleteOrchestrator() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => mcpClientOrchestrator.deleteOrchestrator(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['orchestrator', 'orchestrators'] })
+    },
+  })
+}
+
+// Orchestration hooks
+export function useOrchestrations(filters?: {
+  orchestratorId?: string
+  status?: 'pending' | 'thought' | 'planning' | 'executing' | 'paused' | 'completed' | 'failed'
+  limit?: number
+  skip?: number
+}) {
+  return useQuery({
+    queryKey: ['orchestrator', 'orchestrations', filters],
+    queryFn: () => mcpClientOrchestrator.listOrchestrations(filters),
+    staleTime: 1000 * 60 * 2, // 2 minutes for execution history
+  })
+}
+
+export function useOrchestrationExecutions(filters?: {
+  orchestratorId?: string
+  status?: 'pending' | 'thought' | 'planning' | 'executing' | 'paused' | 'completed' | 'failed'
+  limit?: number
+  skip?: number
+}) {
+  return useQuery({
+    queryKey: ['orchestrator', 'orchestration-executions', filters],
+    queryFn: () => mcpClientOrchestrator.listOrchestrationExecutions(filters),
+    staleTime: 1000 * 60 * 2, // 2 minutes for execution history
+  })
+}
+
+export function useOrchestration(id: string) {
+  return useQuery({
+    queryKey: ['orchestrator', 'orchestration', id],
+    queryFn: () => mcpClientOrchestrator.getOrchestration(id),
+    enabled: !!id,
+    staleTime: 1000 * 60 * 2,
+  })
+}
+
+// Intelligence Dashboard hooks
+export function useIntelligenceStats(timeRange?: string) {
+  return useQuery({
+    queryKey: ['intelligence', 'stats', timeRange],
+    queryFn: () => mcpClientOrchestrator.getIntelligenceStats(timeRange),
+    staleTime: 1000 * 60 * 2, // 2 minutes
+  })
+}
+
+export function useIntelligenceHealth() {
+  return useQuery({
+    queryKey: ['intelligence', 'health'],
+    queryFn: () => mcpClientOrchestrator.getIntelligenceHealth(),
+    staleTime: 1000 * 30, // 30 seconds
+    refetchInterval: 1000 * 60, // Refetch every minute
+  })
+}
+
+export function useIntelligenceMetrics(timeRange?: string, type?: string) {
+  return useQuery({
+    queryKey: ['intelligence', 'metrics', timeRange, type],
+    queryFn: () => mcpClientOrchestrator.getIntelligenceMetrics(timeRange, type),
+    staleTime: 1000 * 60 * 2, // 2 minutes
+  })
+}
+
+// Semantic Search hooks
+export function useSemanticSearch(
+  query: string,
+  filters?: any,
+  options?: { enabled?: boolean }
+) {
+  return useQuery({
+    queryKey: ['intelligence', 'semantic-search', query, filters],
+    queryFn: () => mcpClientOrchestrator.searchSimilarExecutions(query, filters),
+    enabled: options?.enabled !== false && query.length > 0,
+    staleTime: 1000 * 60 * 5, // 5 minutes
+  })
+}
+
+// Embeddings hooks
+export function useEmbeddingsStatus() {
+  return useQuery({
+    queryKey: ['intelligence', 'embeddings', 'status'],
+    queryFn: () => mcpClientOrchestrator.getEmbeddingsStatus(),
+    staleTime: 1000 * 60 * 2, // 2 minutes
+    refetchInterval: 1000 * 60 * 5, // Refetch every 5 minutes
+  })
+}
+
+export function useEmbeddingsTimeline(timeRange?: string) {
+  return useQuery({
+    queryKey: ['intelligence', 'embeddings', 'timeline', timeRange],
+    queryFn: () => mcpClientOrchestrator.getEmbeddingsTimeline(timeRange),
+    staleTime: 1000 * 60 * 5, // 5 minutes
+  })
+}
+
+export function useTriggerBackfill() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (options?: { orchestratorId?: string }) =>
+      mcpClientOrchestrator.triggerBackfill(options),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['intelligence', 'embeddings'] })
+    },
+  })
+}
+
+export function useBackfillStatus() {
+  return useQuery({
+    queryKey: ['intelligence', 'embeddings', 'backfill-status'],
+    queryFn: () => mcpClientOrchestrator.getBackfillStatus(),
+    staleTime: 1000 * 10, // 10 seconds
+    refetchInterval: 1000 * 10, // Refetch every 10 seconds when backfill is running
+  })
+}
+
+export function useExecuteOrchestration() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({
+      orchestratorId,
+      userQuery,
+      conversationHistory,
+      stream = true,
+    }: {
+      orchestratorId: string
+      userQuery: string
+      conversationHistory?: Array<{ role: 'user' | 'assistant' | 'system'; content: string }>
+      stream?: boolean
+    }) =>
+      mcpClientOrchestrator.executeOrchestration(orchestratorId, userQuery, {
+        conversationHistory,
+        stream,
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['orchestrator', 'orchestrations'] })
+    },
+  })
+}
+
+// Performance Metrics hooks
+export function usePerformanceMetrics(filters?: {
+  executionId?: string
+  orchestratorId?: string
+  agentConfigId?: string
+  startDate?: string
+  endDate?: string
+  limit?: number
+  skip?: number
+}) {
+  return useQuery({
+    queryKey: ['orchestrator', 'performance-metrics', filters],
+    queryFn: () => mcpClientOrchestrator.getPerformanceMetrics(filters),
+    staleTime: 1000 * 60 * 5,
+  })
+}
+
+export function useCapturePerformanceMetrics() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ executionId, metrics }: { executionId: string; metrics: any }) =>
+      mcpClientOrchestrator.capturePerformanceMetrics(executionId, metrics),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['orchestrator', 'performance-metrics'] })
+    },
+  })
+}
+
+export function usePerformanceTrends(filters: {
+  orchestratorId?: string
+  agentConfigId?: string
+  metricType?: 'successRate' | 'latency' | 'confidence' | 'quality' | 'cost'
+  startDate?: string
+  endDate?: string
+}) {
+  return useQuery({
+    queryKey: ['orchestrator', 'performance-trends', filters],
+    queryFn: () => mcpClientOrchestrator.analyzePerformanceTrends(filters),
+    enabled: !!filters.orchestratorId || !!filters.agentConfigId,
+    staleTime: 1000 * 60 * 5,
+  })
+}
+
+export function usePerformanceReport(filters: {
+  orchestratorId: string
+  startDate?: string
+  endDate?: string
+  format?: 'summary' | 'detailed'
+}) {
+  return useQuery({
+    queryKey: ['orchestrator', 'performance-report', filters],
+    queryFn: () => mcpClientOrchestrator.getPerformanceReport(filters),
+    enabled: !!filters.orchestratorId,
+    staleTime: 1000 * 60 * 5,
+  })
+}
+
+// Confidence Scores hooks
+export function useConfidenceScores(filters?: {
+  executionId?: string
+  orchestratorId?: string
+  phase?: 'thought' | 'plan' | 'execution' | 'summary' | 'completed'
+  startDate?: string
+  endDate?: string
+  limit?: number
+  skip?: number
+}) {
+  return useQuery({
+    queryKey: ['orchestrator', 'confidence-scores', filters],
+    queryFn: () => mcpClientOrchestrator.getConfidenceScores(filters),
+    staleTime: 1000 * 60 * 5,
+  })
+}
+
+export function useStoreConfidenceScore() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({
+      executionId,
+      phase,
+      scores,
+      agentConfigId,
+      reasoning,
+    }: {
+      executionId: string
+      phase: 'thought' | 'plan' | 'execution' | 'summary' | 'completed'
+      scores: {
+        thought?: number
+        plan?: number
+        execution?: number
+        summary?: number
+        overall?: number
+      }
+      agentConfigId?: string
+      reasoning?: string
+    }) =>
+      mcpClientOrchestrator.storeConfidenceScore(executionId, phase, scores, {
+        agentConfigId,
+        reasoning,
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['orchestrator', 'confidence-scores'] })
+    },
+  })
+}
+
+export function useConfidenceCalibration(filters: {
+  orchestratorId?: string
+  phase?: 'thought' | 'plan' | 'execution' | 'summary' | 'completed'
+  startDate?: string
+  endDate?: string
+}) {
+  return useQuery({
+    queryKey: ['orchestrator', 'confidence-calibration', filters],
+    queryFn: () => mcpClientOrchestrator.analyzeConfidenceCalibration(filters),
+    staleTime: 1000 * 60 * 5,
+  })
+}
+
+// Performance Baselines hooks
+export function useCreatePerformanceBaseline() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (data: {
+      orchestratorId: string
+      name: string
+      description?: string
+      startDate: string
+      endDate: string
+    }) => mcpClientOrchestrator.createPerformanceBaseline(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['orchestrator', 'performance-baselines'] })
+    },
+  })
+}
+
+export function useComparePerformance() {
+  return useMutation({
+    mutationFn: (data: {
+      orchestratorId: string
+      baselineId: string
+      startDate?: string
+      endDate?: string
+    }) => mcpClientOrchestrator.comparePerformance(data),
   })
 }

@@ -107,18 +107,18 @@ export function ToolPerformanceResults() {
 
             <div className="grid grid-cols-3 gap-4">
               <div className="text-center p-4 bg-muted rounded-lg">
-                <div className="text-2xl font-bold">{performance.totalExecutions || performance.totalCalls || 0}</div>
+                <div className="text-2xl font-bold">{(performance as any).totalExecutions || (performance as any).totalCalls || 0}</div>
                 <div className="text-xs text-muted-foreground">Total Executions</div>
               </div>
               <div className="text-center p-4 bg-green-50 dark:bg-green-950/20 rounded-lg">
                 <div className="text-2xl font-bold text-green-600 dark:text-green-400">
-                  {performance.successCount || performance.successfulCalls || 0}
+                  {(performance as any).successCount || (performance as any).successfulCalls || 0}
                 </div>
                 <div className="text-xs text-muted-foreground">Successful</div>
               </div>
               <div className="text-center p-4 bg-red-50 dark:bg-red-950/20 rounded-lg">
                 <div className="text-2xl font-bold text-red-600 dark:text-red-400">
-                  {performance.failureCount || performance.failedCalls || 0}
+                  {(performance as any).failureCount || (performance as any).failedCalls || 0}
                 </div>
                 <div className="text-xs text-muted-foreground">Failed</div>
               </div>
